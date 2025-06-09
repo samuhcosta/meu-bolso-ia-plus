@@ -1,52 +1,56 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export interface Transaction {
   id: string;
-  userId: string;
+  user_id: string;
   type: 'income' | 'expense' | 'transfer';
   amount: number;
   category: string;
   description: string;
   date: string;
-  createdAt: string;
+  created_at: string;
 }
 
 export interface Goal {
   id: string;
-  userId: string;
+  user_id: string;
   title: string;
-  targetAmount: number;
-  currentAmount: number;
+  target_amount: number;
+  current_amount: number;
   deadline: string;
-  createdAt: string;
+  created_at: string;
 }
 
 export interface Notification {
   id: string;
-  userId: string;
+  user_id: string;
   title: string;
   message: string;
   type: 'alert' | 'goal' | 'motivation' | 'bill';
   read: boolean;
-  createdAt: string;
+  created_at: string;
 }
 
 interface FinancialContextType {
   transactions: Transaction[];
   goals: Goal[];
   notifications: Notification[];
-  addTransaction: (transaction: Omit<Transaction, 'id' | 'userId' | 'createdAt'>) => void;
-  updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
-  deleteTransaction: (id: string) => void;
-  addGoal: (goal: Omit<Goal, 'id' | 'userId' | 'createdAt'>) => void;
-  updateGoal: (id: string, goal: Partial<Goal>) => void;
-  deleteGoal: (id: string) => void;
-  markNotificationAsRead: (id: string) => void;
+  addTransaction: (transaction: Omit<Transaction, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
+  updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
+  addGoal: (goal: Omit<Goal, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
+  updateGoal: (id: string, goal: Partial<Goal>) => Promise<void>;
+  deleteGoal: (id: string) => Promise<void>;
+  markNotificationAsRead: (id: string) => Promise<void>;
   getBalance: () => { income: number; expenses: number; balance: number };
   getTransactionsByPeriod: (year: number, month?: number) => Transaction[];
   getCategoryExpenses: () => { [key: string]: number };
+  isLoading: boolean;
+  refreshData: () => Promise<void>;
 }
 
 const FinancialContext = createContext<FinancialContextType | undefined>(undefined);
@@ -59,21 +63,22 @@ export const useFinancial = () => {
   return context;
 };
 
-const categories = [
+export const categories = [
   'Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Educação', 
   'Lazer', 'Roupas', 'Outros', 'Salário', 'Freelance', 'Investimentos'
 ];
 
 export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
-      loadUserData();
-      generateSampleNotifications();
+      refreshData();
     } else {
       setTransactions([]);
       setGoals([]);
@@ -81,133 +86,253 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [user]);
 
-  const loadUserData = () => {
+  const refreshData = async () => {
     if (!user) return;
     
-    const savedTransactions = JSON.parse(localStorage.getItem(`transactions_${user.id}`) || '[]');
-    const savedGoals = JSON.parse(localStorage.getItem(`goals_${user.id}`) || '[]');
-    const savedNotifications = JSON.parse(localStorage.getItem(`notifications_${user.id}`) || '[]');
-    
-    setTransactions(savedTransactions);
-    setGoals(savedGoals);
-    setNotifications(savedNotifications);
-  };
+    setIsLoading(true);
+    try {
+      // Load transactions
+      const { data: transactionsData, error: transactionsError } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false });
 
-  const generateSampleNotifications = () => {
-    if (!user) return;
-    
-    const sampleNotifications: Notification[] = [
-      {
-        id: '1',
-        userId: user.id,
-        title: 'Meta em andamento!',
-        message: 'Você está a 75% da sua meta de economia mensal. Continue assim!',
-        type: 'motivation',
-        read: false,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: '2',
-        userId: user.id,
-        title: 'Gasto acima da média',
-        message: 'Seus gastos com alimentação estão 20% acima do mês passado.',
-        type: 'alert',
-        read: false,
-        createdAt: new Date().toISOString()
+      if (transactionsError) {
+        console.error('Error loading transactions:', transactionsError);
+      } else {
+        setTransactions(transactionsData || []);
       }
-    ];
-    
-    const existing = JSON.parse(localStorage.getItem(`notifications_${user.id}`) || '[]');
-    if (existing.length === 0) {
-      localStorage.setItem(`notifications_${user.id}`, JSON.stringify(sampleNotifications));
-      setNotifications(sampleNotifications);
+
+      // Load goals
+      const { data: goalsData, error: goalsError } = await supabase
+        .from('goals')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (goalsError) {
+        console.error('Error loading goals:', goalsError);
+      } else {
+        setGoals(goalsData || []);
+      }
+
+      // Load notifications
+      const { data: notificationsData, error: notificationsError } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (notificationsError) {
+        console.error('Error loading notifications:', notificationsError);
+      } else {
+        setNotifications(notificationsData || []);
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const addTransaction = (transactionData: Omit<Transaction, 'id' | 'userId' | 'createdAt'>) => {
+  const addTransaction = async (transactionData: Omit<Transaction, 'id' | 'user_id' | 'created_at'>) => {
     if (!user) return;
     
-    const newTransaction: Transaction = {
-      ...transactionData,
-      id: Date.now().toString(),
-      userId: user.id,
-      createdAt: new Date().toISOString()
-    };
-    
-    const updatedTransactions = [...transactions, newTransaction];
-    setTransactions(updatedTransactions);
-    localStorage.setItem(`transactions_${user.id}`, JSON.stringify(updatedTransactions));
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .insert({
+          ...transactionData,
+          user_id: user.id
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding transaction:', error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível adicionar a transação.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setTransactions(prev => [data, ...prev]);
+      toast({
+        title: "Sucesso!",
+        description: "Transação adicionada com sucesso.",
+      });
+    } catch (error) {
+      console.error('Error adding transaction:', error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao adicionar transação.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const updateTransaction = (id: string, transactionData: Partial<Transaction>) => {
+  const updateTransaction = async (id: string, transactionData: Partial<Transaction>) => {
     if (!user) return;
     
-    const updatedTransactions = transactions.map(t => 
-      t.id === id ? { ...t, ...transactionData } : t
-    );
-    setTransactions(updatedTransactions);
-    localStorage.setItem(`transactions_${user.id}`, JSON.stringify(updatedTransactions));
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .update(transactionData)
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating transaction:', error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível atualizar a transação.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setTransactions(prev => prev.map(t => t.id === id ? data : t));
+      toast({
+        title: "Sucesso!",
+        description: "Transação atualizada com sucesso.",
+      });
+    } catch (error) {
+      console.error('Error updating transaction:', error);
+    }
   };
 
-  const deleteTransaction = (id: string) => {
+  const deleteTransaction = async (id: string) => {
     if (!user) return;
     
-    const updatedTransactions = transactions.filter(t => t.id !== id);
-    setTransactions(updatedTransactions);
-    localStorage.setItem(`transactions_${user.id}`, JSON.stringify(updatedTransactions));
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error deleting transaction:', error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível excluir a transação.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setTransactions(prev => prev.filter(t => t.id !== id));
+      toast({
+        title: "Sucesso!",
+        description: "Transação excluída com sucesso.",
+      });
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+    }
   };
 
-  const addGoal = (goalData: Omit<Goal, 'id' | 'userId' | 'createdAt'>) => {
+  const addGoal = async (goalData: Omit<Goal, 'id' | 'user_id' | 'created_at'>) => {
     if (!user) return;
     
-    const newGoal: Goal = {
-      ...goalData,
-      id: Date.now().toString(),
-      userId: user.id,
-      createdAt: new Date().toISOString()
-    };
-    
-    const updatedGoals = [...goals, newGoal];
-    setGoals(updatedGoals);
-    localStorage.setItem(`goals_${user.id}`, JSON.stringify(updatedGoals));
+    try {
+      const { data, error } = await supabase
+        .from('goals')
+        .insert({
+          ...goalData,
+          user_id: user.id
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding goal:', error);
+        return;
+      }
+
+      setGoals(prev => [data, ...prev]);
+    } catch (error) {
+      console.error('Error adding goal:', error);
+    }
   };
 
-  const updateGoal = (id: string, goalData: Partial<Goal>) => {
+  const updateGoal = async (id: string, goalData: Partial<Goal>) => {
     if (!user) return;
     
-    const updatedGoals = goals.map(g => 
-      g.id === id ? { ...g, ...goalData } : g
-    );
-    setGoals(updatedGoals);
-    localStorage.setItem(`goals_${user.id}`, JSON.stringify(updatedGoals));
+    try {
+      const { data, error } = await supabase
+        .from('goals')
+        .update(goalData)
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating goal:', error);
+        return;
+      }
+
+      setGoals(prev => prev.map(g => g.id === id ? data : g));
+    } catch (error) {
+      console.error('Error updating goal:', error);
+    }
   };
 
-  const deleteGoal = (id: string) => {
+  const deleteGoal = async (id: string) => {
     if (!user) return;
     
-    const updatedGoals = goals.filter(g => g.id !== id);
-    setGoals(updatedGoals);
-    localStorage.setItem(`goals_${user.id}`, JSON.stringify(updatedGoals));
+    try {
+      const { error } = await supabase
+        .from('goals')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error deleting goal:', error);
+        return;
+      }
+
+      setGoals(prev => prev.filter(g => g.id !== id));
+    } catch (error) {
+      console.error('Error deleting goal:', error);
+    }
   };
 
-  const markNotificationAsRead = (id: string) => {
+  const markNotificationAsRead = async (id: string) => {
     if (!user) return;
     
-    const updatedNotifications = notifications.map(n => 
-      n.id === id ? { ...n, read: true } : n
-    );
-    setNotifications(updatedNotifications);
-    localStorage.setItem(`notifications_${user.id}`, JSON.stringify(updatedNotifications));
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error marking notification as read:', error);
+        return;
+      }
+
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
   };
 
   const getBalance = () => {
     const income = transactions
       .filter(t => t.type === 'income')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + Number(t.amount), 0);
     
     const expenses = transactions
       .filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + Number(t.amount), 0);
     
     return {
       income,
@@ -231,7 +356,7 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     transactions
       .filter(t => t.type === 'expense')
       .forEach(t => {
-        categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount;
+        categoryTotals[t.category] = (categoryTotals[t.category] || 0) + Number(t.amount);
       });
     
     return categoryTotals;
@@ -250,7 +375,9 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     markNotificationAsRead,
     getBalance,
     getTransactionsByPeriod,
-    getCategoryExpenses
+    getCategoryExpenses,
+    isLoading,
+    refreshData
   };
 
   return (
@@ -259,5 +386,3 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     </FinancialContext.Provider>
   );
 };
-
-export { categories };

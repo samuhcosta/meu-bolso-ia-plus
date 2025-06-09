@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useFinancial, categories, Transaction } from '@/contexts/FinancialContext';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -15,11 +16,12 @@ import {
   Search, 
   Edit, 
   Trash2,
-  Calendar
+  Calendar,
+  Loader2
 } from 'lucide-react';
 
 const Finances = () => {
-  const { transactions, addTransaction, updateTransaction, deleteTransaction } = useFinancial();
+  const { transactions, addTransaction, updateTransaction, deleteTransaction, isLoading } = useFinancial();
   const { toast } = useToast();
   
   const [formData, setFormData] = useState({
@@ -34,12 +36,13 @@ const Finances = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterType, setFilterType] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.amount || !formData.category || !formData.description) {
@@ -51,33 +54,33 @@ const Finances = () => {
       return;
     }
 
+    setIsSubmitting(true);
+
     const transactionData = {
       ...formData,
       amount: parseFloat(formData.amount)
     };
 
-    if (editingId) {
-      updateTransaction(editingId, transactionData);
-      toast({
-        title: "Transação atualizada!",
-        description: "As informações foram salvas com sucesso.",
-      });
-      setEditingId(null);
-    } else {
-      addTransaction(transactionData);
-      toast({
-        title: "Transação adicionada!",
-        description: "Sua movimentação foi registrada com sucesso.",
-      });
-    }
+    try {
+      if (editingId) {
+        await updateTransaction(editingId, transactionData);
+        setEditingId(null);
+      } else {
+        await addTransaction(transactionData);
+      }
 
-    setFormData({
-      type: 'expense',
-      amount: '',
-      category: '',
-      description: '',
-      date: new Date().toISOString().split('T')[0]
-    });
+      setFormData({
+        type: 'expense',
+        amount: '',
+        category: '',
+        description: '',
+        date: new Date().toISOString().split('T')[0]
+      });
+    } catch (error) {
+      console.error('Error submitting transaction:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleEdit = (transaction: Transaction) => {
@@ -91,12 +94,10 @@ const Finances = () => {
     setEditingId(transaction.id);
   };
 
-  const handleDelete = (id: string) => {
-    deleteTransaction(id);
-    toast({
-      title: "Transação excluída",
-      description: "A transação foi removida com sucesso.",
-    });
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Tem certeza que deseja excluir esta transação?')) {
+      await deleteTransaction(id);
+    }
   };
 
   const filteredTransactions = transactions
@@ -106,14 +107,39 @@ const Finances = () => {
       const matchesCategory = !filterCategory || t.category === filterCategory;
       const matchesType = !filterType || t.type === filterType;
       return matchesSearch && matchesCategory && matchesType;
-    })
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    });
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
     }).format(value);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('pt-BR');
+  };
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'income':
+        return <TrendingUp className="w-4 h-4 text-green-600" />;
+      case 'expense':
+        return <TrendingDown className="w-4 h-4 text-red-600" />;
+      case 'transfer':
+        return <Calendar className="w-4 h-4 text-blue-600" />;
+      default:
+        return null;
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'income': return 'Receita';
+      case 'expense': return 'Despesa';
+      case 'transfer': return 'Transferência';
+      default: return type;
+    }
   };
 
   return (
@@ -154,19 +180,19 @@ const Finances = () => {
                       <SelectContent>
                         <SelectItem value="income">
                           <div className="flex items-center">
-                            <TrendingUp className="w-4 h-4 mr-2 text-secondary" />
+                            <TrendingUp className="w-4 h-4 mr-2 text-green-600" />
                             Receita
                           </div>
                         </SelectItem>
                         <SelectItem value="expense">
                           <div className="flex items-center">
-                            <TrendingDown className="w-4 h-4 mr-2 text-destructive" />
+                            <TrendingDown className="w-4 h-4 mr-2 text-red-600" />
                             Despesa
                           </div>
                         </SelectItem>
                         <SelectItem value="transfer">
                           <div className="flex items-center">
-                            <Calendar className="w-4 h-4 mr-2 text-primary" />
+                            <Calendar className="w-4 h-4 mr-2 text-blue-600" />
                             Transferência
                           </div>
                         </SelectItem>
@@ -229,7 +255,8 @@ const Finances = () => {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button type="submit">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                     {editingId ? 'Atualizar Transação' : 'Adicionar Transação'}
                   </Button>
                   {editingId && (
@@ -311,86 +338,88 @@ const Finances = () => {
             </CardContent>
           </Card>
 
-          {/* Transactions List */}
+          {/* Transactions Table */}
           <Card>
             <CardHeader>
               <CardTitle>Lista de Transações</CardTitle>
               <CardDescription>
-                {filteredTransactions.length} transação(ões) encontrada(s)
+                {isLoading ? 'Carregando...' : `${filteredTransactions.length} transação(ões) encontrada(s)`}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {filteredTransactions.length === 0 ? (
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin" />
+                </div>
+              ) : filteredTransactions.length === 0 ? (
                 <div className="text-center py-8">
                   <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground">
-                    Nenhuma transação encontrada com os filtros aplicados
+                    {transactions.length === 0 
+                      ? "Você ainda não possui nenhuma transação registrada. Adicione sua primeira transação!"
+                      : "Nenhuma transação encontrada com os filtros aplicados"
+                    }
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {filteredTransactions.map((transaction) => (
-                    <div
-                      key={transaction.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          transaction.type === 'income' 
-                            ? 'bg-secondary/10' 
-                            : transaction.type === 'expense'
-                            ? 'bg-destructive/10'
-                            : 'bg-primary/10'
-                        }`}>
-                          {transaction.type === 'income' ? (
-                            <TrendingUp className="w-5 h-5 text-secondary" />
-                          ) : transaction.type === 'expense' ? (
-                            <TrendingDown className="w-5 h-5 text-destructive" />
-                          ) : (
-                            <Calendar className="w-5 h-5 text-primary" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-medium">{transaction.description}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {transaction.category} • {new Date(transaction.date).toLocaleDateString('pt-BR')}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-3">
-                        <div className="text-right">
-                          <p className={`font-semibold ${
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Categoria</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                        <TableHead className="text-center">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredTransactions.map((transaction) => (
+                        <TableRow key={transaction.id}>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              {getTypeIcon(transaction.type)}
+                              <span className="font-medium">
+                                {getTypeLabel(transaction.type)}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>{formatDate(transaction.date)}</TableCell>
+                          <TableCell>{transaction.category}</TableCell>
+                          <TableCell>{transaction.description}</TableCell>
+                          <TableCell className={`text-right font-semibold ${
                             transaction.type === 'income' 
-                              ? 'text-secondary' 
+                              ? 'text-green-600' 
                               : transaction.type === 'expense'
-                              ? 'text-destructive'
-                              : 'text-primary'
+                              ? 'text-red-600'
+                              : 'text-blue-600'
                           }`}>
                             {transaction.type === 'income' ? '+' : transaction.type === 'expense' ? '-' : ''}
-                            {formatCurrency(transaction.amount)}
-                          </p>
-                        </div>
-                        
-                        <div className="flex space-x-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleEdit(transaction)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDelete(transaction.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                            {formatCurrency(Number(transaction.amount))}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex justify-center space-x-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleEdit(transaction)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDelete(transaction.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               )}
             </CardContent>

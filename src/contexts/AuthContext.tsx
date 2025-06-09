@@ -1,21 +1,22 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { User } from '@supabase/supabase-js';
 
-interface User {
+interface UserProfile {
   id: string;
   name: string;
   email: string;
   whatsapp?: string;
-  plan: 'free' | 'pro' | 'premium';
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: UserProfile | null;
   login: (email: string, password: string) => Promise<boolean>;
   register: (name: string, email: string, password: string, whatsapp?: string) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
-  updateUser: (userData: Partial<User>) => void;
+  updateUser: (userData: Partial<UserProfile>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,39 +30,76 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in on app start
-    const savedUser = localStorage.getItem('meubolsopro_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setIsLoading(false);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        loadUserProfile(session.user);
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        await loadUserProfile(session.user);
+      } else {
+        setUser(null);
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  const loadUserProfile = async (authUser: User) => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading profile:', error);
+        setIsLoading(false);
+        return;
+      }
+
+      setUser({
+        id: authUser.id,
+        name: profile?.name || authUser.user_metadata?.name || '',
+        email: authUser.email || '',
+        whatsapp: profile?.whatsapp || ''
+      });
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Check if user exists in localStorage (mock database)
-      const users = JSON.parse(localStorage.getItem('meubolsopro_users') || '[]');
-      const foundUser = users.find((u: any) => u.email === email && u.password === password);
-      
-      if (foundUser) {
-        const { password: _, ...userWithoutPassword } = foundUser;
-        setUser(userWithoutPassword);
-        localStorage.setItem('meubolsopro_user', JSON.stringify(userWithoutPassword));
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        console.error('Login error:', error);
         setIsLoading(false);
-        return true;
+        return false;
       }
-      
-      setIsLoading(false);
-      return false;
+
+      return true;
     } catch (error) {
+      console.error('Login error:', error);
       setIsLoading(false);
       return false;
     }
@@ -70,58 +108,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (name: string, email: string, password: string, whatsapp?: string): Promise<boolean> => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Check if user already exists
-      const users = JSON.parse(localStorage.getItem('meubolsopro_users') || '[]');
-      if (users.find((u: any) => u.email === email)) {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: name
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Registration error:', error);
         setIsLoading(false);
         return false;
       }
-      
-      const newUser = {
-        id: Date.now().toString(),
-        name,
-        email,
-        password,
-        whatsapp,
-        plan: 'free' as const
-      };
-      
-      users.push(newUser);
-      localStorage.setItem('meubolsopro_users', JSON.stringify(users));
-      
-      const { password: _, ...userWithoutPassword } = newUser;
-      setUser(userWithoutPassword);
-      localStorage.setItem('meubolsopro_user', JSON.stringify(userWithoutPassword));
-      
-      setIsLoading(false);
+
+      // Update profile with additional data
+      if (data.user && whatsapp) {
+        await supabase
+          .from('profiles')
+          .update({ whatsapp })
+          .eq('id', data.user.id);
+      }
+
       return true;
     } catch (error) {
+      console.error('Registration error:', error);
       setIsLoading(false);
       return false;
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('meubolsopro_user');
   };
 
-  const updateUser = (userData: Partial<User>) => {
-    if (user) {
-      const updatedUser = { ...user, ...userData };
-      setUser(updatedUser);
-      localStorage.setItem('meubolsopro_user', JSON.stringify(updatedUser));
-      
-      // Update in users array too
-      const users = JSON.parse(localStorage.getItem('meubolsopro_users') || '[]');
-      const userIndex = users.findIndex((u: any) => u.id === user.id);
-      if (userIndex !== -1) {
-        users[userIndex] = { ...users[userIndex], ...userData };
-        localStorage.setItem('meubolsopro_users', JSON.stringify(users));
+  const updateUser = async (userData: Partial<UserProfile>) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update(userData)
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Error updating profile:', error);
+        return;
       }
+
+      setUser({ ...user, ...userData });
+    } catch (error) {
+      console.error('Error updating user:', error);
     }
   };
 
