@@ -3,46 +3,25 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
 
-export interface Transaction {
-  id: string;
-  user_id: string;
-  type: 'income' | 'expense' | 'transfer';
-  amount: number;
-  category: string;
-  description: string;
-  date: string;
-  created_at: string;
-}
+// Use the exact types from Supabase
+export type Transaction = Database['public']['Tables']['transactions']['Row'];
+export type Goal = Database['public']['Tables']['goals']['Row'];
+export type Notification = Database['public']['Tables']['notifications']['Row'];
 
-export interface Goal {
-  id: string;
-  user_id: string;
-  title: string;
-  target_amount: number;
-  current_amount: number;
-  deadline: string;
-  created_at: string;
-}
-
-export interface Notification {
-  id: string;
-  user_id: string;
-  title: string;
-  message: string;
-  type: 'alert' | 'goal' | 'motivation' | 'bill';
-  read: boolean;
-  created_at: string;
-}
+// Input types for inserts
+export type TransactionInsert = Database['public']['Tables']['transactions']['Insert'];
+export type GoalInsert = Database['public']['Tables']['goals']['Insert'];
 
 interface FinancialContextType {
   transactions: Transaction[];
   goals: Goal[];
   notifications: Notification[];
-  addTransaction: (transaction: Omit<Transaction, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
+  addTransaction: (transaction: Omit<TransactionInsert, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
-  addGoal: (goal: Omit<Goal, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
+  addGoal: (goal: Omit<GoalInsert, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>;
   updateGoal: (id: string, goal: Partial<Goal>) => Promise<void>;
   deleteGoal: (id: string) => Promise<void>;
   markNotificationAsRead: (id: string) => Promise<void>;
@@ -136,7 +115,7 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  const addTransaction = async (transactionData: Omit<Transaction, 'id' | 'user_id' | 'created_at'>) => {
+  const addTransaction = async (transactionData: Omit<TransactionInsert, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     if (!user) return;
     
     try {
@@ -236,7 +215,7 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  const addGoal = async (goalData: Omit<Goal, 'id' | 'user_id' | 'created_at'>) => {
+  const addGoal = async (goalData: Omit<GoalInsert, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     if (!user) return;
     
     try {

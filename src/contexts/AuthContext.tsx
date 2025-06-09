@@ -1,7 +1,10 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
+import type { Database } from '@/integrations/supabase/types';
+
+// Use the exact profile type from Supabase
+type Profile = Database['public']['Tables']['profiles']['Row'];
 
 interface UserProfile {
   id: string;
