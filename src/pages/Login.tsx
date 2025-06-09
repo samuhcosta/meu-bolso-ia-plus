@@ -35,9 +35,9 @@ const Login = () => {
 
     setIsSubmitting(true);
     
-    const success = await login(formData.email, formData.password);
+    const result = await login(formData.email, formData.password);
     
-    if (success) {
+    if (result.success) {
       toast({
         title: "Login realizado!",
         description: "Bem-vindo ao Meu Bolso Pro!",
@@ -46,7 +46,7 @@ const Login = () => {
     } else {
       toast({
         title: "Erro no login",
-        description: "Email ou senha incorretos. Tente novamente.",
+        description: result.error || "Erro desconhecido. Tente novamente.",
         variant: "destructive",
       });
     }
@@ -127,6 +127,15 @@ const Login = () => {
               Entrar
             </Button>
           </form>
+
+          <div className="mt-4 text-center">
+            <Link 
+              to="/forgot-password" 
+              className="text-sm text-primary hover:underline"
+            >
+              Esqueceu sua senha?
+            </Link>
+          </div>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">

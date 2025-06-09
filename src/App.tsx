@@ -12,6 +12,8 @@ import Layout from "@/components/Layout";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Finances from "./pages/Finances";
 import Reports from "./pages/Reports";
@@ -77,6 +79,8 @@ const App = () => (
                 <Route path="/" element={<PublicRoute><Index /></PublicRoute>} />
                 <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
                 <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+                <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+                <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
                 <Route path="/plans" element={<Plans />} />
                 <Route path="/support" element={<Support />} />
                 

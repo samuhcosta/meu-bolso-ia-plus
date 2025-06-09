@@ -1,37 +1,51 @@
 
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 
-const Register = () => {
-  const { register, isLoading } = useAuth();
+const ResetPassword = () => {
+  const { resetPassword } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
     password: '',
-    confirmPassword: '',
-    whatsapp: ''
+    confirmPassword: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const tokenFromUrl = searchParams.get('token');
+    if (!tokenFromUrl) {
+      toast({
+        title: "Link inválido",
+        description: "Este link de redefinição é inválido ou expirou.",
+        variant: "destructive",
+      });
+      navigate('/forgot-password');
+    } else {
+      setToken(tokenFromUrl);
+    }
+  }, [searchParams, navigate, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
+    if (!formData.password || !formData.confirmPassword) {
       toast({
         title: "Erro de validação",
-        description: "Por favor, preencha todos os campos obrigatórios.",
+        description: "Por favor, preencha todos os campos.",
         variant: "destructive",
       });
       return;
@@ -55,26 +69,29 @@ const Register = () => {
       return;
     }
 
+    if (!token) {
+      toast({
+        title: "Erro",
+        description: "Token de redefinição não encontrado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     
-    const result = await register(
-      formData.name, 
-      formData.email, 
-      formData.password, 
-      formData.whatsapp || undefined
-    );
+    const result = await resetPassword(token, formData.password);
     
     if (result.success) {
+      setIsSuccess(true);
       toast({
-        title: "Conta criada!",
-        description: "Bem-vindo ao Meu Bolso Pro! Redirecionando para o dashboard...",
+        title: "Senha redefinida!",
+        description: "Sua senha foi alterada com sucesso.",
       });
-      // Redirect immediately to dashboard - no email verification required
-      navigate('/dashboard');
     } else {
       toast({
-        title: "Erro no cadastro",
-        description: result.error || "Não foi possível criar sua conta. Tente novamente.",
+        title: "Erro",
+        description: result.error || "Erro desconhecido. Tente novamente.",
         variant: "destructive",
       });
     }
@@ -86,10 +103,58 @@ const Register = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  if (isLoading) {
+  if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-green-50 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-primary">
+              Senha Redefinida!
+            </CardTitle>
+            <CardDescription>
+              Sua senha foi alterada com sucesso. Agora você pode fazer login com sua nova senha.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button 
+              onClick={() => navigate('/login')}
+              className="w-full"
+            >
+              Ir para o Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!token) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-green-50 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+              <AlertCircle className="h-8 w-8 text-red-600" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-primary">
+              Link Inválido
+            </CardTitle>
+            <CardDescription>
+              Este link de redefinição é inválido ou expirou.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button 
+              onClick={() => navigate('/forgot-password')}
+              className="w-full"
+            >
+              Solicitar Nova Redefinição
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -99,51 +164,16 @@ const Register = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-primary">
-            Criar Conta
+            Nova Senha
           </CardTitle>
           <CardDescription>
-            Crie sua conta grátis no Meu Bolso Pro
+            Digite sua nova senha para redefinir o acesso à sua conta
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nome Completo *</Label>
-              <Input
-                id="name"
-                type="text"
-                placeholder="Seu nome completo"
-                value={formData.name}
-                onChange={(e) => handleInputChange('name', e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="whatsapp">WhatsApp (opcional)</Label>
-              <Input
-                id="whatsapp"
-                type="tel"
-                placeholder="(11) 99999-9999"
-                value={formData.whatsapp}
-                onChange={(e) => handleInputChange('whatsapp', e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha *</Label>
+              <Label htmlFor="password">Nova Senha</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -170,12 +200,12 @@ const Register = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirmar Senha *</Label>
+              <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
               <div className="relative">
                 <Input
                   id="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
-                  placeholder="Confirme sua senha"
+                  placeholder="Confirme sua nova senha"
                   value={formData.confirmPassword}
                   onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
                   required
@@ -202,17 +232,17 @@ const Register = () => {
               disabled={isSubmitting}
             >
               {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Criar Conta
+              Redefinir Senha
             </Button>
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              Já tem uma conta?{' '}
-              <Link to="/login" className="text-primary hover:underline font-medium">
-                Faça login
-              </Link>
-            </p>
+            <Link 
+              to="/login"
+              className="text-sm text-primary hover:underline"
+            >
+              Voltar para o login
+            </Link>
           </div>
         </CardContent>
       </Card>
@@ -220,4 +250,4 @@ const Register = () => {
   );
 };
 
-export default Register;
+export default ResetPassword;

@@ -78,6 +78,8 @@ export type Database = {
           email: string | null
           id: string
           name: string | null
+          reset_token: string | null
+          reset_token_expires_at: string | null
           updated_at: string
           whatsapp: string | null
         }
@@ -86,6 +88,8 @@ export type Database = {
           email?: string | null
           id: string
           name?: string | null
+          reset_token?: string | null
+          reset_token_expires_at?: string | null
           updated_at?: string
           whatsapp?: string | null
         }
@@ -94,6 +98,8 @@ export type Database = {
           email?: string | null
           id?: string
           name?: string | null
+          reset_token?: string | null
+          reset_token_expires_at?: string | null
           updated_at?: string
           whatsapp?: string | null
         }
@@ -140,7 +146,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      cleanup_expired_reset_tokens: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
