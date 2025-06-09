@@ -63,7 +63,7 @@ const Notifications = () => {
 
   const unreadCount = notifications.filter(n => !n.read).length;
   const sortedNotifications = [...notifications].sort((a, b) => 
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
   return (
@@ -161,7 +161,7 @@ const Notifications = () => {
                           {notification.message}
                         </p>
                         <p className="text-xs text-muted-foreground mt-2">
-                          {new Date(notification.createdAt).toLocaleString('pt-BR')}
+                          {new Date(notification.created_at).toLocaleString('pt-BR')}
                         </p>
                       </div>
                       

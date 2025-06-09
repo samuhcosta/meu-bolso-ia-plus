@@ -39,7 +39,7 @@ const Dashboard = () => {
     .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const activeGoals = goals.filter(g => g.currentAmount < g.targetAmount);
+  const activeGoals = goals.filter(g => g.current_amount < g.target_amount);
   const unreadNotifications = notifications.filter(n => !n.read);
 
   const formatCurrency = (value: number) => {
@@ -252,7 +252,7 @@ const Dashboard = () => {
             ) : (
               <div className="space-y-4">
                 {goals.slice(0, 3).map((goal) => {
-                  const progress = (goal.currentAmount / goal.targetAmount) * 100;
+                  const progress = (goal.current_amount / goal.target_amount) * 100;
                   return (
                     <div key={goal.id} className="space-y-2">
                       <div className="flex justify-between items-center">
@@ -268,8 +268,8 @@ const Dashboard = () => {
                         />
                       </div>
                       <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{formatCurrency(goal.currentAmount)}</span>
-                        <span>{formatCurrency(goal.targetAmount)}</span>
+                        <span>{formatCurrency(goal.current_amount)}</span>
+                        <span>{formatCurrency(goal.target_amount)}</span>
                       </div>
                     </div>
                   );

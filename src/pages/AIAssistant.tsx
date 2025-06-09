@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -98,15 +97,15 @@ const AIAssistant = () => {
         return "🎯 Você ainda não tem metas financeiras definidas! Metas são fundamentais para o sucesso financeiro.\n\n✨ Sugestões de metas:\n• Reserva de emergência (6x suas despesas mensais)\n• Viagem dos sonhos\n• Compra de um bem\n\nVamos criar sua primeira meta?";
       }
       
-      const activeGoals = goals.filter(g => g.currentAmount < g.targetAmount);
+      const activeGoals = goals.filter(g => g.current_amount < g.target_amount);
       return `🎯 Você tem ${goals.length} meta(s) definida(s), sendo ${activeGoals.length} ainda ativa(s).\n\n${goals.slice(0, 2).map(g => {
-        const progress = (g.currentAmount / g.targetAmount) * 100;
-        return `• ${g.title}: ${progress.toFixed(1)}% (${formatCurrency(g.currentAmount)} de ${formatCurrency(g.targetAmount)})`;
+        const progress = (g.current_amount / g.target_amount) * 100;
+        return `• ${g.title}: ${progress.toFixed(1)}% (${formatCurrency(g.current_amount)} de ${formatCurrency(g.target_amount)})`;
       }).join('\n')}\n\n💪 Continue focado! Cada economia te aproxima dos seus objetivos.`;
     }
 
     if (message.includes('relatório') || message.includes('resumo')) {
-      return `📈 Resumo das suas finanças:\n\n💰 Saldo atual: ${formatCurrency(balance.balance)}\n📊 Gastos do mês: ${formatCurrency(monthlyExpenses)}\n🎯 Metas ativas: ${goals.filter(g => g.currentAmount < g.targetAmount).length}\n📱 Transações registradas: ${transactions.length}\n\n🔍 Para análises mais detalhadas, acesse a seção de Relatórios!`;
+      return `📈 Resumo das suas finanças:\n\n💰 Saldo atual: ${formatCurrency(balance.balance)}\n📊 Gastos do mês: ${formatCurrency(monthlyExpenses)}\n🎯 Metas ativas: ${goals.filter(g => g.current_amount < g.target_amount).length}\n📱 Transações registradas: ${transactions.length}\n\n🔍 Para análises mais detalhadas, acesse a seção de Relatórios!`;
     }
 
     // Respostas padrão

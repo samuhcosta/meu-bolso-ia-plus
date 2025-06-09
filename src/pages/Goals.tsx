@@ -14,8 +14,8 @@ const Goals = () => {
 
   const [formData, setFormData] = useState({
     title: '',
-    targetAmount: '',
-    currentAmount: '',
+    target_amount: '',
+    current_amount: '',
     deadline: ''
   });
 
@@ -28,7 +28,7 @@ const Goals = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.title || !formData.targetAmount || !formData.deadline) {
+    if (!formData.title || !formData.target_amount || !formData.deadline) {
       toast({
         title: "Erro de validação",
         description: "Por favor, preencha todos os campos obrigatórios.",
@@ -39,8 +39,8 @@ const Goals = () => {
 
     const goalData = {
       title: formData.title,
-      targetAmount: parseFloat(formData.targetAmount),
-      currentAmount: parseFloat(formData.currentAmount) || 0,
+      target_amount: parseFloat(formData.target_amount),
+      current_amount: parseFloat(formData.current_amount) || 0,
       deadline: formData.deadline
     };
 
@@ -61,8 +61,8 @@ const Goals = () => {
 
     setFormData({
       title: '',
-      targetAmount: '',
-      currentAmount: '',
+      target_amount: '',
+      current_amount: '',
       deadline: ''
     });
   };
@@ -70,8 +70,8 @@ const Goals = () => {
   const handleEdit = (goal: any) => {
     setFormData({
       title: goal.title,
-      targetAmount: goal.targetAmount.toString(),
-      currentAmount: goal.currentAmount.toString(),
+      target_amount: goal.target_amount.toString(),
+      current_amount: goal.current_amount.toString(),
       deadline: goal.deadline
     });
     setEditingId(goal.id);
@@ -88,7 +88,7 @@ const Goals = () => {
   const handleUpdateProgress = (goalId: string, amount: number) => {
     const goal = goals.find(g => g.id === goalId);
     if (goal) {
-      updateGoal(goalId, { currentAmount: goal.currentAmount + amount });
+      updateGoal(goalId, { current_amount: goal.current_amount + amount });
       toast({
         title: "Progresso atualizado!",
         description: `Adicionado ${formatCurrency(amount)} à sua meta.`,
@@ -150,14 +150,14 @@ const Goals = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="targetAmount">Valor da Meta (R$) *</Label>
+                <Label htmlFor="target_amount">Valor da Meta (R$) *</Label>
                 <Input
-                  id="targetAmount"
+                  id="target_amount"
                   type="number"
                   step="0.01"
                   placeholder="10000,00"
-                  value={formData.targetAmount}
-                  onChange={(e) => handleInputChange('targetAmount', e.target.value)}
+                  value={formData.target_amount}
+                  onChange={(e) => handleInputChange('target_amount', e.target.value)}
                   required
                 />
               </div>
@@ -165,14 +165,14 @@ const Goals = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="currentAmount">Valor Atual (R$)</Label>
+                <Label htmlFor="current_amount">Valor Atual (R$)</Label>
                 <Input
-                  id="currentAmount"
+                  id="current_amount"
                   type="number"
                   step="0.01"
                   placeholder="0,00"
-                  value={formData.currentAmount}
-                  onChange={(e) => handleInputChange('currentAmount', e.target.value)}
+                  value={formData.current_amount}
+                  onChange={(e) => handleInputChange('current_amount', e.target.value)}
                 />
               </div>
 
@@ -200,8 +200,8 @@ const Goals = () => {
                     setEditingId(null);
                     setFormData({
                       title: '',
-                      targetAmount: '',
-                      currentAmount: '',
+                      target_amount: '',
+                      current_amount: '',
                       deadline: ''
                     });
                   }}
@@ -234,7 +234,7 @@ const Goals = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {goals.map((goal) => {
-              const progress = getProgressPercentage(goal.currentAmount, goal.targetAmount);
+              const progress = getProgressPercentage(goal.current_amount, goal.target_amount);
               const daysLeft = getDaysUntilDeadline(goal.deadline);
               const isCompleted = progress >= 100;
               const isOverdue = daysLeft < 0 && !isCompleted;
@@ -289,8 +289,8 @@ const Goals = () => {
                         />
                       </div>
                       <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>{formatCurrency(goal.currentAmount)}</span>
-                        <span>{formatCurrency(goal.targetAmount)}</span>
+                        <span>{formatCurrency(goal.current_amount)}</span>
+                        <span>{formatCurrency(goal.target_amount)}</span>
                       </div>
                     </div>
 
@@ -322,7 +322,7 @@ const Goals = () => {
                     )}
 
                     <div className="text-xs text-muted-foreground">
-                      Meta criada em {new Date(goal.createdAt).toLocaleDateString('pt-BR')}
+                      Meta criada em {new Date(goal.created_at).toLocaleDateString('pt-BR')}
                     </div>
                   </CardContent>
                 </Card>

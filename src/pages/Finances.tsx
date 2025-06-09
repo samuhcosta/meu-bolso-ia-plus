@@ -1,29 +1,30 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useFinancial, categories, Transaction } from '@/contexts/FinancialContext';
+import { Badge } from '@/components/ui/badge';
+import { useFinancial, categories } from '@/contexts/FinancialContext';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Plus, 
   TrendingUp, 
   TrendingDown, 
   Search, 
-  Edit, 
+  Filter,
+  Edit,
   Trash2,
   Calendar,
-  Loader2
+  DollarSign
 } from 'lucide-react';
 
 const Finances = () => {
-  const { transactions, addTransaction, updateTransaction, deleteTransaction, isLoading } = useFinancial();
+  const { transactions, addTransaction, updateTransaction, deleteTransaction } = useFinancial();
   const { toast } = useToast();
-  
+
   const [formData, setFormData] = useState({
     type: 'expense' as 'income' | 'expense' | 'transfer',
     amount: '',
@@ -33,19 +34,26 @@ const Finances = () => {
   });
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState('');
-  const [filterType, setFilterType] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [filters, setFilters] = useState({
+    search: '',
+    category: '',
+    type: '',
+    month: '',
+    year: new Date().getFullYear().toString()
+  });
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleFilterChange = (field: string, value: string) => {
+    setFilters(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.amount || !formData.category || !formData.description) {
+
+    if (!formData.amount || !formData.category || !formData.description || !formData.date) {
       toast({
         title: "Erro de validação",
         description: "Por favor, preencha todos os campos.",
@@ -54,36 +62,31 @@ const Finances = () => {
       return;
     }
 
-    setIsSubmitting(true);
-
     const transactionData = {
-      ...formData,
-      amount: parseFloat(formData.amount)
+      type: formData.type,
+      amount: parseFloat(formData.amount),
+      category: formData.category,
+      description: formData.description,
+      date: formData.date
     };
 
-    try {
-      if (editingId) {
-        await updateTransaction(editingId, transactionData);
-        setEditingId(null);
-      } else {
-        await addTransaction(transactionData);
-      }
-
-      setFormData({
-        type: 'expense',
-        amount: '',
-        category: '',
-        description: '',
-        date: new Date().toISOString().split('T')[0]
-      });
-    } catch (error) {
-      console.error('Error submitting transaction:', error);
-    } finally {
-      setIsSubmitting(false);
+    if (editingId) {
+      updateTransaction(editingId, transactionData);
+      setEditingId(null);
+    } else {
+      addTransaction(transactionData);
     }
+
+    setFormData({
+      type: 'expense',
+      amount: '',
+      category: '',
+      description: '',
+      date: new Date().toISOString().split('T')[0]
+    });
   };
 
-  const handleEdit = (transaction: Transaction) => {
+  const handleEdit = (transaction: any) => {
     setFormData({
       type: transaction.type,
       amount: transaction.amount.toString(),
@@ -94,20 +97,9 @@ const Finances = () => {
     setEditingId(transaction.id);
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir esta transação?')) {
-      await deleteTransaction(id);
-    }
+  const handleDelete = (id: string) => {
+    deleteTransaction(id);
   };
-
-  const filteredTransactions = transactions
-    .filter(t => {
-      const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           t.category.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = !filterCategory || t.category === filterCategory;
-      const matchesType = !filterType || t.type === filterType;
-      return matchesSearch && matchesCategory && matchesType;
-    });
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -116,48 +108,48 @@ const Finances = () => {
     }).format(value);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR');
-  };
+  // Filter transactions
+  const filteredTransactions = transactions.filter(transaction => {
+    const matchesSearch = transaction.description.toLowerCase().includes(filters.search.toLowerCase()) ||
+                         transaction.category.toLowerCase().includes(filters.search.toLowerCase());
+    const matchesCategory = !filters.category || transaction.category === filters.category;
+    const matchesType = !filters.type || transaction.type === filters.type;
+    
+    const transactionDate = new Date(transaction.date);
+    const matchesMonth = !filters.month || transactionDate.getMonth() === parseInt(filters.month);
+    const matchesYear = transactionDate.getFullYear().toString() === filters.year;
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'income':
-        return <TrendingUp className="w-4 h-4 text-green-600" />;
-      case 'expense':
-        return <TrendingDown className="w-4 h-4 text-red-600" />;
-      case 'transfer':
-        return <Calendar className="w-4 h-4 text-blue-600" />;
-      default:
-        return null;
-    }
-  };
+    return matchesSearch && matchesCategory && matchesType && matchesMonth && matchesYear;
+  });
 
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case 'income': return 'Receita';
-      case 'expense': return 'Despesa';
-      case 'transfer': return 'Transferência';
-      default: return type;
-    }
-  };
+  // Calculate totals
+  const totalIncome = filteredTransactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalExpenses = filteredTransactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const balance = totalIncome - totalExpenses;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Minhas Finanças</h1>
         <p className="text-muted-foreground">
-          Gerencie suas receitas, despesas e transferências
+          Gerencie suas transações e acompanhe seus gastos
         </p>
       </div>
 
-      <Tabs defaultValue="add" className="w-full">
+      <Tabs defaultValue="transactions" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="add">Adicionar Transação</TabsTrigger>
-          <TabsTrigger value="list">Minhas Transações</TabsTrigger>
+          <TabsTrigger value="transactions">Minhas Transações</TabsTrigger>
+          <TabsTrigger value="add-transaction">Nova Transação</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="add" className="space-y-6">
+        <TabsContent value="add-transaction" className="space-y-6">
+          {/* Add Transaction Form */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -165,37 +157,22 @@ const Finances = () => {
                 {editingId ? 'Editar Transação' : 'Nova Transação'}
               </CardTitle>
               <CardDescription>
-                {editingId ? 'Atualize os dados da transação' : 'Adicione uma nova movimentação financeira'}
+                {editingId ? 'Atualize os dados da transação' : 'Adicione uma nova receita ou despesa'}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Tipo *</Label>
+                    <Label htmlFor="type">Tipo *</Label>
                     <Select value={formData.type} onValueChange={(value) => handleInputChange('type', value)}>
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Selecione o tipo" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="income">
-                          <div className="flex items-center">
-                            <TrendingUp className="w-4 h-4 mr-2 text-green-600" />
-                            Receita
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="expense">
-                          <div className="flex items-center">
-                            <TrendingDown className="w-4 h-4 mr-2 text-red-600" />
-                            Despesa
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="transfer">
-                          <div className="flex items-center">
-                            <Calendar className="w-4 h-4 mr-2 text-blue-600" />
-                            Transferência
-                          </div>
-                        </SelectItem>
+                        <SelectItem value="income">Receita</SelectItem>
+                        <SelectItem value="expense">Despesa</SelectItem>
+                        <SelectItem value="transfer">Transferência</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -212,6 +189,24 @@ const Finances = () => {
                       required
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Categoria *</Label>
+                    <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="date">Data *</Label>
@@ -225,38 +220,19 @@ const Finances = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Categoria *</Label>
-                    <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma categoria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Descrição *</Label>
-                    <Input
-                      id="description"
-                      placeholder="Ex: Compra no supermercado"
-                      value={formData.description}
-                      onChange={(e) => handleInputChange('description', e.target.value)}
-                      required
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Descrição *</Label>
+                  <Input
+                    id="description"
+                    placeholder="Ex: Compra no supermercado"
+                    value={formData.description}
+                    onChange={(e) => handleInputChange('description', e.target.value)}
+                    required
+                  />
                 </div>
 
                 <div className="flex gap-2">
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  <Button type="submit">
                     {editingId ? 'Atualizar Transação' : 'Adicionar Transação'}
                   </Button>
                   {editingId && (
@@ -283,143 +259,250 @@ const Finances = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="list" className="space-y-6">
+        <TabsContent value="transactions" className="space-y-6">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Receitas</CardTitle>
+                <TrendingUp className="h-4 w-4 text-secondary" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-secondary">
+                  {formatCurrency(totalIncome)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {filteredTransactions.filter(t => t.type === 'income').length} transações
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Despesas</CardTitle>
+                <TrendingDown className="h-4 w-4 text-destructive" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-destructive">
+                  {formatCurrency(totalExpenses)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {filteredTransactions.filter(t => t.type === 'expense').length} transações
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Saldo</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${
+                  balance >= 0 ? 'text-secondary' : 'text-destructive'
+                }`}>
+                  {formatCurrency(balance)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {filteredTransactions.length} transações no total
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Filters */}
           <Card>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar transação..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Filter className="w-5 h-5 mr-2" />
+                Filtros
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="search">Buscar</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="search"
+                      placeholder="Descrição ou categoria"
+                      value={filters.search}
+                      onChange={(e) => handleFilterChange('search', e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
                 </div>
 
-                <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos os tipos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Todos os tipos</SelectItem>
-                    <SelectItem value="income">Receitas</SelectItem>
-                    <SelectItem value="expense">Despesas</SelectItem>
-                    <SelectItem value="transfer">Transferências</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <Label>Categoria</Label>
+                  <Select value={filters.category} onValueChange={(value) => handleFilterChange('category', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todas</SelectItem>
+                      {categories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                <Select value={filterCategory} onValueChange={setFilterCategory}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas as categorias" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Todas as categorias</SelectItem>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <Label>Tipo</Label>
+                  <Select value={filters.type} onValueChange={(value) => handleFilterChange('type', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="income">Receita</SelectItem>
+                      <SelectItem value="expense">Despesa</SelectItem>
+                      <SelectItem value="transfer">Transferência</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setSearchTerm('');
-                    setFilterCategory('');
-                    setFilterType('');
-                  }}
-                >
-                  Limpar Filtros
-                </Button>
+                <div className="space-y-2">
+                  <Label>Mês</Label>
+                  <Select value={filters.month} onValueChange={(value) => handleFilterChange('month', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="0">Janeiro</SelectItem>
+                      <SelectItem value="1">Fevereiro</SelectItem>
+                      <SelectItem value="2">Março</SelectItem>
+                      <SelectItem value="3">Abril</SelectItem>
+                      <SelectItem value="4">Maio</SelectItem>
+                      <SelectItem value="5">Junho</SelectItem>
+                      <SelectItem value="6">Julho</SelectItem>
+                      <SelectItem value="7">Agosto</SelectItem>
+                      <SelectItem value="8">Setembro</SelectItem>
+                      <SelectItem value="9">Outubro</SelectItem>
+                      <SelectItem value="10">Novembro</SelectItem>
+                      <SelectItem value="11">Dezembro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Ano</Label>
+                  <Select value={filters.year} onValueChange={(value) => handleFilterChange('year', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Ano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Transactions Table */}
+          {/* Transactions List */}
           <Card>
             <CardHeader>
               <CardTitle>Lista de Transações</CardTitle>
               <CardDescription>
-                {isLoading ? 'Carregando...' : `${filteredTransactions.length} transação(ões) encontrada(s)`}
+                {filteredTransactions.length > 0 
+                  ? `${filteredTransactions.length} transação(ões) encontrada(s)`
+                  : 'Nenhuma transação encontrada'
+                }
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-8 h-8 animate-spin" />
-                </div>
-              ) : filteredTransactions.length === 0 ? (
-                <div className="text-center py-8">
-                  <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">
+              {filteredTransactions.length === 0 ? (
+                <div className="text-center py-12">
+                  <Calendar className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">
                     {transactions.length === 0 
-                      ? "Você ainda não possui nenhuma transação registrada. Adicione sua primeira transação!"
-                      : "Nenhuma transação encontrada com os filtros aplicados"
+                      ? 'Nenhuma transação registrada'
+                      : 'Nenhuma transação encontrada'
+                    }
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    {transactions.length === 0 
+                      ? 'Comece adicionando sua primeira transação'
+                      : 'Tente ajustar os filtros para encontrar suas transações'
                     }
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Data</TableHead>
-                        <TableHead>Categoria</TableHead>
-                        <TableHead>Descrição</TableHead>
-                        <TableHead className="text-right">Valor</TableHead>
-                        <TableHead className="text-center">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredTransactions.map((transaction) => (
-                        <TableRow key={transaction.id}>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              {getTypeIcon(transaction.type)}
-                              <span className="font-medium">
-                                {getTypeLabel(transaction.type)}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>{formatDate(transaction.date)}</TableCell>
-                          <TableCell>{transaction.category}</TableCell>
-                          <TableCell>{transaction.description}</TableCell>
-                          <TableCell className={`text-right font-semibold ${
-                            transaction.type === 'income' 
-                              ? 'text-green-600' 
-                              : transaction.type === 'expense'
-                              ? 'text-red-600'
-                              : 'text-blue-600'
-                          }`}>
-                            {transaction.type === 'income' ? '+' : transaction.type === 'expense' ? '-' : ''}
-                            {formatCurrency(Number(transaction.amount))}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex justify-center space-x-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleEdit(transaction)}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleDelete(transaction.id)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <div className="space-y-4">
+                  {filteredTransactions.map((transaction) => (
+                    <div 
+                      key={transaction.id} 
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          transaction.type === 'income' 
+                            ? 'bg-secondary/10' 
+                            : transaction.type === 'expense'
+                            ? 'bg-destructive/10'
+                            : 'bg-primary/10'
+                        }`}>
+                          {transaction.type === 'income' ? (
+                            <TrendingUp className="w-5 h-5 text-secondary" />
+                          ) : transaction.type === 'expense' ? (
+                            <TrendingDown className="w-5 h-5 text-destructive" />
+                          ) : (
+                            <DollarSign className="w-5 h-5 text-primary" />
+                          )}
+                        </div>
+                        
+                        <div>
+                          <h4 className="font-medium">{transaction.description}</h4>
+                          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                            <Badge variant="outline">{transaction.category}</Badge>
+                            <span>•</span>
+                            <span>{new Date(transaction.date).toLocaleDateString('pt-BR')}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-4">
+                        <div className={`text-lg font-semibold ${
+                          transaction.type === 'income' 
+                            ? 'text-secondary' 
+                            : transaction.type === 'expense'
+                            ? 'text-destructive'
+                            : 'text-primary'
+                        }`}>
+                          {transaction.type === 'income' ? '+' : transaction.type === 'expense' ? '-' : ''}
+                          {formatCurrency(transaction.amount)}
+                        </div>
+                        
+                        <div className="flex space-x-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEdit(transaction)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDelete(transaction.id)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>

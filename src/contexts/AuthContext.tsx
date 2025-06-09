@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
@@ -11,6 +12,7 @@ interface UserProfile {
   name: string;
   email: string;
   whatsapp?: string;
+  plan?: string; // Added plan property
 }
 
 interface AuthContextType {
@@ -77,7 +79,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: authUser.id,
         name: profile?.name || authUser.user_metadata?.name || '',
         email: authUser.email || '',
-        whatsapp: profile?.whatsapp || ''
+        whatsapp: profile?.whatsapp || '',
+        plan: 'free' // Default plan
       });
     } catch (error) {
       console.error('Error loading user profile:', error);
