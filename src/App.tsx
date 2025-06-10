@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { FinancialProvider } from "@/contexts/FinancialContext";
+import { DebtProvider } from "@/contexts/DebtContext";
 import Layout from "@/components/Layout";
 
 // Pages
@@ -16,6 +17,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Finances from "./pages/Finances";
+import Debts from "./pages/Debts";
 import Reports from "./pages/Reports";
 import Goals from "./pages/Goals";
 import AIAssistant from "./pages/AIAssistant";
@@ -72,34 +74,37 @@ const App = () => (
       <Sonner />
       <AuthProvider>
         <FinancialProvider>
-          <BrowserRouter>
-            <Layout>
-              <Routes>
-                {/* Public Routes */}
-                <Route path="/" element={<PublicRoute><Index /></PublicRoute>} />
-                <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-                <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-                <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
-                <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
-                <Route path="/plans" element={<Plans />} />
-                <Route path="/support" element={<Support />} />
-                
-                {/* Protected Routes */}
-                <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                <Route path="/finances" element={<ProtectedRoute><Finances /></ProtectedRoute>} />
-                <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-                <Route path="/goals" element={<ProtectedRoute><Goals /></ProtectedRoute>} />
-                <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
-                <Route path="/import" element={<ProtectedRoute><Import /></ProtectedRoute>} />
-                <Route path="/family" element={<ProtectedRoute><Family /></ProtectedRoute>} />
-                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-                
-                {/* Catch all route */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Layout>
-          </BrowserRouter>
+          <DebtProvider>
+            <BrowserRouter>
+              <Layout>
+                <Routes>
+                  {/* Public Routes */}
+                  <Route path="/" element={<PublicRoute><Index /></PublicRoute>} />
+                  <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+                  <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+                  <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+                  <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
+                  <Route path="/plans" element={<Plans />} />
+                  <Route path="/support" element={<Support />} />
+                  
+                  {/* Protected Routes */}
+                  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                  <Route path="/finances" element={<ProtectedRoute><Finances /></ProtectedRoute>} />
+                  <Route path="/debts" element={<ProtectedRoute><Debts /></ProtectedRoute>} />
+                  <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+                  <Route path="/goals" element={<ProtectedRoute><Goals /></ProtectedRoute>} />
+                  <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
+                  <Route path="/import" element={<ProtectedRoute><Import /></ProtectedRoute>} />
+                  <Route path="/family" element={<ProtectedRoute><Family /></ProtectedRoute>} />
+                  <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                  <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+                  
+                  {/* Catch all route */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Layout>
+            </BrowserRouter>
+          </DebtProvider>
         </FinancialProvider>
       </AuthProvider>
     </TooltipProvider>

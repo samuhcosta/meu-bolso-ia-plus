@@ -3,7 +3,7 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFinancial } from '@/contexts/FinancialContext';
 import { Button } from '@/components/ui/button';
-import { Bell, Home, BarChart3, Target, Bot, FileText, Users, Settings, LogOut, DollarSign } from 'lucide-react';
+import { Bell, Home, BarChart3, Target, Bot, FileText, Users, Settings, LogOut, DollarSign, CreditCard } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 interface LayoutProps {
@@ -30,6 +30,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const menuItems = [
     { icon: Home, label: 'Dashboard', path: '/dashboard' },
     { icon: DollarSign, label: 'Minhas Finanças', path: '/finances' },
+    { icon: CreditCard, label: 'Dívidas Programadas', path: '/debts' },
     { icon: BarChart3, label: 'Relatórios', path: '/reports' },
     { icon: Target, label: 'Metas', path: '/goals' },
     { icon: Bot, label: 'Assistente IA', path: '/ai-assistant' },
@@ -98,7 +99,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         {/* Mobile Menu */}
         <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-border p-2 z-50">
           <div className="flex justify-around">
-            {menuItems.slice(0, 4).map((item) => (
+            {menuItems.slice(0, 5).map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
@@ -109,7 +110,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 }`}
               >
                 <item.icon className="w-5 h-5" />
-                <span>{item.label}</span>
+                <span className="text-[10px]">{item.label.split(' ')[0]}</span>
               </Link>
             ))}
           </div>

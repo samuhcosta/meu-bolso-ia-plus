@@ -9,6 +9,143 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      debt_installments: {
+        Row: {
+          amount: number
+          created_at: string
+          debt_id: string
+          due_date: string
+          id: string
+          installment_number: number
+          is_paid: boolean
+          paid_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          debt_id: string
+          due_date: string
+          id?: string
+          installment_number: number
+          is_paid?: boolean
+          paid_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          debt_id?: string
+          due_date?: string
+          id?: string
+          installment_number?: number
+          is_paid?: boolean
+          paid_date?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debt_installments_debt_id_fkey"
+            columns: ["debt_id"]
+            isOneToOne: false
+            referencedRelation: "debts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      debt_notifications: {
+        Row: {
+          created_at: string
+          debt_id: string
+          id: string
+          installment_id: string
+          notification_type: string
+          sent_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          debt_id: string
+          id?: string
+          installment_id: string
+          notification_type: string
+          sent_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          debt_id?: string
+          id?: string
+          installment_id?: string
+          notification_type?: string
+          sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debt_notifications_debt_id_fkey"
+            columns: ["debt_id"]
+            isOneToOne: false
+            referencedRelation: "debts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "debt_notifications_installment_id_fkey"
+            columns: ["installment_id"]
+            isOneToOne: false
+            referencedRelation: "debt_installments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      debts: {
+        Row: {
+          category: string
+          created_at: string
+          first_installment_date: string
+          id: string
+          installment_amount: number
+          monthly_due_day: number
+          name: string
+          notes: string | null
+          notifications_enabled: boolean
+          paid_installments: number
+          total_amount: number
+          total_installments: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          first_installment_date: string
+          id?: string
+          installment_amount: number
+          monthly_due_day: number
+          name: string
+          notes?: string | null
+          notifications_enabled?: boolean
+          paid_installments?: number
+          total_amount: number
+          total_installments: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          first_installment_date?: string
+          id?: string
+          installment_amount?: number
+          monthly_due_day?: number
+          name?: string
+          notes?: string | null
+          notifications_enabled?: boolean
+          paid_installments?: number
+          total_amount?: number
+          total_installments?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       goals: {
         Row: {
           created_at: string
@@ -148,6 +285,16 @@ export type Database = {
     Functions: {
       cleanup_expired_reset_tokens: {
         Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      generate_debt_installments: {
+        Args: {
+          p_debt_id: string
+          p_total_installments: number
+          p_first_installment_date: string
+          p_monthly_due_day: number
+          p_installment_amount: number
+        }
         Returns: undefined
       }
     }
