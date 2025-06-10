@@ -36,9 +36,9 @@ const Finances = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [filters, setFilters] = useState({
     search: '',
-    category: '',
-    type: '',
-    month: '',
+    category: 'all',
+    type: 'all',
+    month: 'all',
     year: new Date().getFullYear().toString()
   });
 
@@ -112,11 +112,11 @@ const Finances = () => {
   const filteredTransactions = transactions.filter(transaction => {
     const matchesSearch = transaction.description.toLowerCase().includes(filters.search.toLowerCase()) ||
                          transaction.category.toLowerCase().includes(filters.search.toLowerCase());
-    const matchesCategory = !filters.category || transaction.category === filters.category;
-    const matchesType = !filters.type || transaction.type === filters.type;
+    const matchesCategory = filters.category === 'all' || transaction.category === filters.category;
+    const matchesType = filters.type === 'all' || transaction.type === filters.type;
     
     const transactionDate = new Date(transaction.date);
-    const matchesMonth = !filters.month || transactionDate.getMonth() === parseInt(filters.month);
+    const matchesMonth = filters.month === 'all' || transactionDate.getMonth() === parseInt(filters.month);
     const matchesYear = transactionDate.getFullYear().toString() === filters.year;
 
     return matchesSearch && matchesCategory && matchesType && matchesMonth && matchesYear;
@@ -341,7 +341,7 @@ const Finances = () => {
                       <SelectValue placeholder="Todas" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todas</SelectItem>
+                      <SelectItem value="all">Todas</SelectItem>
                       {categories.map((category) => (
                         <SelectItem key={category} value={category}>
                           {category}
@@ -358,7 +358,7 @@ const Finances = () => {
                       <SelectValue placeholder="Todos" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="all">Todos</SelectItem>
                       <SelectItem value="income">Receita</SelectItem>
                       <SelectItem value="expense">Despesa</SelectItem>
                       <SelectItem value="transfer">Transferência</SelectItem>
@@ -373,7 +373,7 @@ const Finances = () => {
                       <SelectValue placeholder="Todos" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="all">Todos</SelectItem>
                       <SelectItem value="0">Janeiro</SelectItem>
                       <SelectItem value="1">Fevereiro</SelectItem>
                       <SelectItem value="2">Março</SelectItem>
