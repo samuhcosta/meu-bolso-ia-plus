@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
@@ -24,6 +23,7 @@ interface AuthContextType {
   updateUser: (userData: Partial<UserProfile>) => void;
   requestPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
   resetPassword: (token: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  error: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,35 +39,96 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session:', session);
-      if (session?.user) {
-        loadUserProfile(session.user);
-      } else {
-        setIsLoading(false);
-      }
-    });
+    let mounted = true;
+    let timeoutId: NodeJS.Timeout;
 
-    // Listen for auth changes
+    const initializeAuth = async () => {
+      try {
+        console.log('Initializing auth...');
+        
+        // Set timeout for loading state
+        timeoutId = setTimeout(() => {
+          if (mounted) {
+            console.warn('Auth initialization timeout');
+            setError('Tempo limite excedido ao carregar. Tente recarregar a página.');
+            setIsLoading(false);
+          }
+        }, 5000);
+
+        // Get initial session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          if (mounted) {
+            setError('Erro ao verificar sessão. Tente fazer login novamente.');
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        console.log('Initial session:', session);
+        
+        if (session?.user && mounted) {
+          await loadUserProfile(session.user);
+        } else if (mounted) {
+          setIsLoading(false);
+        }
+
+        // Clear timeout if we got here successfully
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        if (mounted) {
+          setError('Erro de conexão. Verifique sua internet e tente novamente.');
+          setIsLoading(false);
+        }
+      }
+    };
+
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state change:', event, session);
-      if (session?.user) {
-        await loadUserProfile(session.user);
-      } else {
-        setUser(null);
+      console.log('Auth state change:', event, session?.user?.id);
+      
+      if (!mounted) return;
+
+      try {
+        if (session?.user) {
+          await loadUserProfile(session.user);
+        } else {
+          setUser(null);
+          setError(null);
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('Auth state change error:', error);
+        setError('Erro ao processar mudança de autenticação.');
         setIsLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Initialize auth
+    initializeAuth();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, []);
 
   const loadUserProfile = async (authUser: User) => {
     try {
       console.log('Loading profile for user:', authUser.id);
+      
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
@@ -76,19 +137,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error loading profile:', error);
-        setIsLoading(false);
-        return;
+        // Don't set as critical error, use default values
       }
 
       setUser({
         id: authUser.id,
-        name: profile?.name || authUser.user_metadata?.name || '',
+        name: profile?.name || authUser.user_metadata?.name || 'Usuário',
         email: authUser.email || '',
         whatsapp: profile?.whatsapp || '',
         plan: 'free' // Default plan
       });
+      
+      setError(null);
     } catch (error) {
       console.error('Error loading user profile:', error);
+      // Set user with minimal data instead of failing completely
+      setUser({
+        id: authUser.id,
+        name: authUser.user_metadata?.name || 'Usuário',
+        email: authUser.email || '',
+        plan: 'free'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -96,6 +165,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
+    setError(null);
+    
     try {
       console.log('Attempting login for:', email);
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -128,6 +199,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (name: string, email: string, password: string, whatsapp?: string): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
+    setError(null);
+    
     try {
       console.log('Attempting registration for:', email);
       
@@ -172,8 +245,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setError(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force logout locally even if API fails
+      setUser(null);
+      setError(null);
+    }
   };
 
   const updateUser = async (userData: Partial<UserProfile>) => {
@@ -299,7 +380,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLoading,
     updateUser,
     requestPasswordReset,
-    resetPassword
+    resetPassword,
+    error
   };
 
   return (
@@ -308,3 +390,5 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </AuthContext.Provider>
   );
 };
+
+export default AuthProvider;

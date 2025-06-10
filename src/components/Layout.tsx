@@ -11,15 +11,16 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, logout } = useAuth();
-  const { notifications } = useFinancial();
+  const { user, logout, isLoading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  if (!user) {
+  // Don't render layout during auth loading or if user is not authenticated
+  if (isLoading || !user) {
     return <>{children}</>;
   }
 
+  const { notifications } = useFinancial();
   const unreadNotifications = notifications.filter(n => !n.read).length;
 
   const handleLogout = () => {
