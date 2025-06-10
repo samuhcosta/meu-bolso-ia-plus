@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useFinancial } from '@/contexts/FinancialContext';
+import { useFinancial, Transaction } from '@/contexts/FinancialContext';
 import { useToast } from '@/hooks/use-toast';
 import TransactionForm from '@/components/finance/TransactionForm';
 import FinancialSummary from '@/components/finance/FinancialSummary';
@@ -73,9 +73,9 @@ const Finances = () => {
     });
   };
 
-  const handleEdit = (transaction: any) => {
+  const handleEdit = (transaction: Transaction) => {
     setFormData({
-      type: transaction.type,
+      type: transaction.type as 'income' | 'expense' | 'transfer',
       amount: transaction.amount.toString(),
       category: transaction.category,
       description: transaction.description,
@@ -123,11 +123,11 @@ const Finances = () => {
   // Calculate totals
   const totalIncome = filteredTransactions
     .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + Number(t.amount), 0);
 
   const totalExpenses = filteredTransactions
     .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + Number(t.amount), 0);
 
   const balance = totalIncome - totalExpenses;
 

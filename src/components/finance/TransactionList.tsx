@@ -11,15 +11,7 @@ import {
   Calendar,
   DollarSign
 } from 'lucide-react';
-
-interface Transaction {
-  id: string;
-  type: 'income' | 'expense' | 'transfer';
-  amount: number;
-  category: string;
-  description: string;
-  date: string;
-}
+import { Transaction } from '@/contexts/FinancialContext';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -99,7 +91,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                       : 'text-primary'
                   }`}>
                     {transaction.type === 'income' ? '+' : transaction.type === 'expense' ? '-' : ''}
-                    {formatCurrency(transaction.amount)}
+                    {formatCurrency(Number(transaction.amount))}
                   </div>
                   
                   <div className="flex space-x-1">
