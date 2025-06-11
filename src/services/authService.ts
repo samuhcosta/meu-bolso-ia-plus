@@ -56,12 +56,10 @@ export const registerUser = async (name: string, email: string, password: string
 
     if (data.user && whatsapp) {
       try {
-        const updatePromise = supabase
+        const { error: updateError } = await supabase
           .from('profiles')
           .update({ whatsapp })
           .eq('id', data.user.id);
-        
-        const { error: updateError } = await createTimeoutPromise(updatePromise, 5000);
         
         if (updateError) {
           console.error('Erro ao atualizar WhatsApp:', updateError);
@@ -90,12 +88,10 @@ export const logoutUser = async () => {
 
 export const updateUserProfile = async (userId: string, userData: any): Promise<void> => {
   try {
-    const updatePromise = supabase
+    const { error } = await supabase
       .from('profiles')
       .update(userData)
       .eq('id', userId);
-      
-    const { error } = await createTimeoutPromise(updatePromise, 5000);
 
     if (error) {
       console.error('Erro ao atualizar perfil:', error);
@@ -111,13 +107,11 @@ export const requestPasswordReset = async (email: string): Promise<{ success: bo
   try {
     console.log('Solicitando reset de senha para:', email);
     
-    const profilePromise = supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('id, email')
       .eq('email', email)
       .single();
-      
-    const { data: profile, error: profileError } = await createTimeoutPromise(profilePromise, 5000);
 
     if (profileError || !profile) {
       return { success: false, error: 'E-mail não encontrado em nossa base.' };
@@ -127,7 +121,7 @@ export const requestPasswordReset = async (email: string): Promise<{ success: bo
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 1);
 
-    const updatePromise = supabase
+    const { error: updateError } = await supabase
       .from('profiles')
       .update({ 
         reset_token: resetToken,
@@ -135,8 +129,6 @@ export const requestPasswordReset = async (email: string): Promise<{ success: bo
       })
       .eq('email', email);
       
-    const { error: updateError } = await createTimeoutPromise(updatePromise, 5000);
-
     if (updateError) {
       console.error('Erro ao salvar token de reset:', updateError);
       return { success: false, error: 'Erro interno. Tente novamente.' };
@@ -156,13 +148,11 @@ export const resetPassword = async (token: string, newPassword: string): Promise
   try {
     console.log('Redefinindo senha com token:', token);
     
-    const profilePromise = supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('id, email, reset_token_expires_at')
       .eq('reset_token', token)
       .single();
-      
-    const { data: profile, error: profileError } = await createTimeoutPromise(profilePromise, 5000);
 
     if (profileError || !profile) {
       return { success: false, error: 'Token de redefinição inválido.' };
@@ -185,15 +175,13 @@ export const resetPassword = async (token: string, newPassword: string): Promise
     }
 
     try {
-      const cleanupPromise = supabase
+      await supabase
         .from('profiles')
         .update({ 
           reset_token: null,
           reset_token_expires_at: null
         })
         .eq('reset_token', token);
-        
-      await createTimeoutPromise(cleanupPromise, 5000);
     } catch (cleanupError) {
       console.error('Erro ao limpar token:', cleanupError);
       // Não falhar a operação por causa da limpeza
