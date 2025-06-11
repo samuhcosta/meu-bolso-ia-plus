@@ -55,10 +55,17 @@ export const registerUser = async (name: string, email: string, password: string
     }
 
     if (data.user && whatsapp) {
-      await supabase
-        .from('profiles')
-        .update({ whatsapp })
-        .eq('id', data.user.id);
+      try {
+        const updatePromise = supabase
+          .from('profiles')
+          .update({ whatsapp })
+          .eq('id', data.user.id);
+        
+        await createTimeoutPromise(updatePromise, 5000);
+      } catch (updateError) {
+        console.error('Erro ao atualizar WhatsApp:', updateError);
+        // Não falhar o registro por causa do WhatsApp
+      }
     }
 
     console.log('Registro realizado com sucesso');
@@ -173,13 +180,20 @@ export const resetPassword = async (token: string, newPassword: string): Promise
       return { success: false, error: 'Erro ao redefinir senha. Tente novamente.' };
     }
 
-    await supabase
+    const cleanupPromise = supabase
       .from('profiles')
       .update({ 
         reset_token: null,
         reset_token_expires_at: null
       })
       .eq('reset_token', token);
+
+    try {
+      await createTimeoutPromise(cleanupPromise, 5000);
+    } catch (cleanupError) {
+      console.error('Erro ao limpar token:', cleanupError);
+      // Não falhar a operação por causa da limpeza
+    }
 
     return { success: true };
   } catch (error) {
