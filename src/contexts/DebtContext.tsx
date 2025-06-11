@@ -131,6 +131,24 @@ export const DebtProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setDebts(prev => [data, ...prev]);
       await fetchInstallments(); // Refresh installments after adding debt
 
+      // Integração com receitas - criar transação automática
+      if (debtData.total_amount > 0) {
+        try {
+          await supabase
+            .from('transactions')
+            .insert({
+              user_id: user.id,
+              type: 'expense',
+              category: 'Dívidas',
+              description: `Dívida registrada: ${debtData.name}`,
+              amount: debtData.total_amount,
+              date: new Date().toISOString().split('T')[0]
+            });
+        } catch (transactionError) {
+          console.warn('Erro ao criar transação automática:', transactionError);
+        }
+      }
+
       toast({
         title: "Dívida cadastrada",
         description: "Dívida cadastrada com sucesso!",
@@ -202,6 +220,8 @@ export const DebtProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const markInstallmentAsPaid = async (installmentId: string) => {
+    if (!user) return;
+
     try {
       const { data, error } = await supabase
         .from('debt_installments')
@@ -229,6 +249,22 @@ export const DebtProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await updateDebt(debt.id, {
             paid_installments: debt.paid_installments + 1
           });
+
+          // Integração com receitas - criar receita automática
+          try {
+            await supabase
+              .from('transactions')
+              .insert({
+                user_id: user.id,
+                type: 'expense',
+                category: 'Pagamento de Dívidas',
+                description: `Pagamento parcela ${installment.installment_number} - ${debt.name}`,
+                amount: installment.amount,
+                date: new Date().toISOString().split('T')[0]
+              });
+          } catch (transactionError) {
+            console.warn('Erro ao criar transação de pagamento:', transactionError);
+          }
         }
       }
 

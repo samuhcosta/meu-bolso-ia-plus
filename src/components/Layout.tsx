@@ -1,127 +1,165 @@
 
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useFinancial } from '@/contexts/FinancialContext';
 import { Button } from '@/components/ui/button';
-import { Bell, Home, BarChart3, Target, Bot, FileText, Users, Settings, LogOut, DollarSign, CreditCard } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { 
+  LayoutDashboard, 
+  DollarSign, 
+  CreditCard, 
+  Target, 
+  Users, 
+  FileText, 
+  Settings, 
+  LogOut,
+  Bell,
+  Menu,
+  X
+} from 'lucide-react';
+import { useState } from 'react';
+import DebtNotifications from '@/components/debt/DebtNotifications';
 
-interface LayoutProps {
-  children: React.ReactNode;
-}
-
-const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, logout, isLoading } = useAuth();
+const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, logout } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Don't render layout during auth loading or if user is not authenticated
-  if (isLoading || !user) {
-    return <>{children}</>;
-  }
-
-  const { notifications } = useFinancial();
-  const unreadNotifications = notifications.filter(n => !n.read).length;
-
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
-
-  const menuItems = [
-    { icon: Home, label: 'Dashboard', path: '/dashboard' },
-    { icon: DollarSign, label: 'Minhas Finanças', path: '/finances' },
-    { icon: CreditCard, label: 'Dívidas Programadas', path: '/debts' },
-    { icon: BarChart3, label: 'Relatórios', path: '/reports' },
-    { icon: Target, label: 'Metas', path: '/goals' },
-    { icon: Bot, label: 'Assistente IA', path: '/ai-assistant' },
-    { icon: FileText, label: 'Importar Extratos', path: '/import' },
-    { icon: Users, label: 'Plano Familiar', path: '/family' },
-    { icon: Settings, label: 'Configurações', path: '/settings' },
+  const navigation = [
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Finanças', href: '/finances', icon: DollarSign },
+    { name: 'Dívidas', href: '/debts', icon: CreditCard },
+    { name: 'Metas', href: '/goals', icon: Target },
+    { name: 'Família', href: '/family', icon: Users },
+    { name: 'Relatórios', href: '/reports', icon: FileText },
   ];
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Erro no logout:', error);
+    }
+  };
+
+  const isCurrentPath = (path: string) => {
+    return location.pathname === path;
+  };
+
+  if (!user) {
+    return null;
+  }
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900">
       {/* Header */}
-      <header className="bg-white border-b border-border px-4 py-3 shadow-sm">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link to="/dashboard" className="flex items-center space-x-2">
-            <div className="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-gradient">Meu Bolso Pro</span>
-          </Link>
-          
-          <div className="flex items-center space-x-4">
-            <span className="text-sm text-muted-foreground hidden sm:block">
-              Olá, <span className="font-medium text-foreground">{user.name}</span>
-            </span>
-            
-            <Link to="/notifications" className="relative">
-              <Button variant="ghost" size="sm">
-                <Bell className="w-4 h-4" />
-                {unreadNotifications > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
-                    {unreadNotifications}
-                  </span>
-                )}
+      <header className="sticky top-0 z-40 w-full border-b bg-white/80 backdrop-blur-md dark:bg-gray-900/80 dark:border-gray-800">
+        <div className="container mx-auto px-4">
+          <div className="flex h-16 items-center justify-between">
+            {/* Logo e título */}
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="lg:hidden"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              >
+                {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </Button>
-            </Link>
-            
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline ml-1">Sair</span>
-            </Button>
+              <Link to="/dashboard" className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-purple-600">
+                  <DollarSign className="h-5 w-5 text-white" />
+                </div>
+                <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  Meu Bolso Pro
+                </span>
+              </Link>
+            </div>
+
+            {/* Navigation - Desktop */}
+            <nav className="hidden lg:flex items-center space-x-1">
+              {navigation.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      isCurrentPath(item.href)
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.name}
+                  </Link>
+                );
+              })}
+            </nav>
+
+            {/* User menu */}
+            <div className="flex items-center gap-3">
+              <DebtNotifications />
+              
+              <div className="flex items-center gap-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-gradient-to-br from-blue-600 to-purple-600 text-white">
+                    {user.name?.charAt(0).toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="hidden md:block">
+                  <p className="text-sm font-medium">{user.name}</p>
+                  <p className="text-xs text-muted-foreground">{user.plan}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Link to="/settings">
+                  <Button variant="ghost" size="sm">
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <Button variant="ghost" size="sm" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Mobile Navigation */}
+        {isMobileMenuOpen && (
+          <div className="lg:hidden border-t bg-white dark:bg-gray-900 dark:border-gray-800">
+            <nav className="container mx-auto px-4 py-4">
+              <div className="grid gap-2">
+                {navigation.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        isCurrentPath(item.href)
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      <Icon className="h-5 w-5" />
+                      {item.name}
+                    </Link>
+                  );
+                })}
+              </div>
+            </nav>
+          </div>
+        )}
       </header>
 
-      <div className="max-w-7xl mx-auto flex">
-        {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-border min-h-[calc(100vh-73px)] p-4 hidden lg:block">
-          <nav className="space-y-2">
-            {menuItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  location.pathname === item.path
-                    ? 'bg-primary text-primary-foreground'
-                    : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <item.icon className="w-4 h-4" />
-                <span>{item.label}</span>
-              </Link>
-            ))}
-          </nav>
-        </aside>
-
-        {/* Mobile Menu */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-border p-2 z-50">
-          <div className="flex justify-around">
-            {menuItems.slice(0, 5).map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex flex-col items-center space-y-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  location.pathname === item.path
-                    ? 'text-primary'
-                    : 'text-muted-foreground'
-                }`}
-              >
-                <item.icon className="w-5 h-5" />
-                <span className="text-[10px]">{item.label.split(' ')[0]}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <main className="flex-1 p-4 lg:p-6 pb-20 lg:pb-6">
-          {children}
-        </main>
-      </div>
+      {/* Main content */}
+      <main className="container mx-auto px-4 py-8">
+        {children}
+      </main>
     </div>
   );
 };

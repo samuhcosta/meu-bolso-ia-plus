@@ -1,48 +1,26 @@
 
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useDebt } from '@/contexts/DebtContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useFinancial } from '@/contexts/FinancialContext';
-import { 
-  DollarSign, 
-  TrendingUp, 
-  TrendingDown, 
-  Wallet, 
-  Target, 
-  Bot,
-  Plus,
-  Bell,
-  BarChart3,
-  RefreshCw
-} from 'lucide-react';
+import DebtDashboardCards from '@/components/debt/DebtDashboardCards';
+import DebtListWithDetails from '@/components/debt/DebtListWithDetails';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { Plus, TrendingUp, Calendar, Bell } from 'lucide-react';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { transactions, goals, notifications, getBalance } = useFinancial();
+  const { debts, installments, loading } = useDebt();
 
-  const balance = getBalance();
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-  
-  // Get current month transactions
-  const currentMonthTransactions = transactions.filter(t => {
-    const date = new Date(t.date);
-    return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
-  });
+  const upcomingInstallments = installments
+    .filter(installment => !installment.is_paid)
+    .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+    .slice(0, 5);
 
-  const monthlyIncome = currentMonthTransactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const monthlyExpenses = currentMonthTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const activeGoals = goals.filter(g => g.current_amount < g.target_amount);
-  const unreadNotifications = notifications.filter(n => !n.read);
+  const overdueInstallments = installments.filter(installment => 
+    !installment.is_paid && new Date(installment.due_date) < new Date()
+  );
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -51,299 +29,146 @@ const Dashboard = () => {
     }).format(value);
   };
 
-  const getBalanceColor = (value: number) => {
-    if (value > 0) return 'text-secondary';
-    if (value < 0) return 'text-destructive';
-    return 'text-muted-foreground';
-  };
-
-  const aiSuggestion = monthlyExpenses > 0 
-    ? `Você gastou ${formatCurrency(monthlyExpenses)} este mês. Que tal definir uma meta de economia para o próximo mês?`
-    : "Comece adicionando suas primeiras transações para receber dicas personalizadas!";
-
-  // Skeleton para carregamento
-  const SkeletonCard = () => (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-4 w-4" />
-      </CardHeader>
-      <CardContent>
-        <Skeleton className="h-8 w-32 mb-2" />
-        <Skeleton className="h-3 w-20" />
-      </CardContent>
-    </Card>
-  );
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Visão geral das suas finanças, {user?.name}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Link to="/finances">
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Nova Transação
-            </Button>
-          </Link>
-        </div>
+    <div className="space-y-8">
+      {/* Header de boas-vindas */}
+      <div className="text-center space-y-2">
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          Bem-vindo ao Meu Bolso Pro
+        </h1>
+        <p className="text-xl text-muted-foreground">
+          Olá, {user?.name}! Aqui está o resumo das suas finanças
+        </p>
       </div>
 
-      {/* Financial Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo Total</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${getBalanceColor(balance.balance)}`}>
-              {formatCurrency(balance.balance)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Total de receitas - despesas
-            </p>
-          </CardContent>
-        </Card>
+      {/* Cards principais de dívidas */}
+      <DebtDashboardCards 
+        debts={debts} 
+        installments={installments}
+        loading={loading}
+      />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receitas do Mês</CardTitle>
-            <TrendingUp className="h-4 w-4 text-secondary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-secondary">
-              {formatCurrency(monthlyIncome)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {currentMonthTransactions.filter(t => t.type === 'income').length} transações
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Gastos do Mês</CardTitle>
-            <TrendingDown className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">
-              {formatCurrency(monthlyExpenses)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {currentMonthTransactions.filter(t => t.type === 'expense').length} transações
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Metas Ativas</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {activeGoals.length}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {goals.length} metas no total
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* AI Suggestion Card */}
-      <Card className="bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Bot className="w-5 h-5 mr-2 text-primary" />
-            Dica da IA
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-foreground mb-4">{aiSuggestion}</p>
-          <div className="flex gap-2">
-            <Link to="/ai-assistant">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Próximas parcelas */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Próximas Parcelas
+            </CardTitle>
+            <Link to="/debts?tab=installments">
               <Button variant="outline" size="sm">
-                Conversar com IA
+                Ver Todas
               </Button>
             </Link>
-            {monthlyExpenses === 0 && (
-              <Link to="/finances">
-                <Button size="sm">
-                  Adicionar Transação
-                </Button>
-              </Link>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Transactions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Transações Recentes</CardTitle>
-            <CardDescription>
-              Suas últimas movimentações financeiras
-            </CardDescription>
           </CardHeader>
           <CardContent>
-            {transactions.length === 0 ? (
-              <div className="text-center py-8">
-                <DollarSign className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">
-                  Nenhuma transação encontrada
-                </p>
-                <Link to="/finances">
-                  <Button>Adicionar primeira transação</Button>
-                </Link>
+            {upcomingInstallments.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground">
+                <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>Nenhuma parcela próxima do vencimento</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {transactions.slice(0, 5).map((transaction) => (
-                  <div key={transaction.id} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        transaction.type === 'income' ? 'bg-secondary/10' : 'bg-destructive/10'
-                      }`}>
-                        {transaction.type === 'income' ? (
-                          <TrendingUp className="w-4 h-4 text-secondary" />
-                        ) : (
-                          <TrendingDown className="w-4 h-4 text-destructive" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">{transaction.description}</p>
-                        <p className="text-xs text-muted-foreground">{transaction.category}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-medium ${
-                        transaction.type === 'income' ? 'text-secondary' : 'text-destructive'
-                      }`}>
-                        {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(transaction.date).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-                <Link to="/finances">
-                  <Button variant="outline" className="w-full">
-                    Ver todas as transações
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Goals Progress */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Progresso das Metas</CardTitle>
-            <CardDescription>
-              Acompanhe o progresso dos seus objetivos
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {goals.length === 0 ? (
-              <div className="text-center py-8">
-                <Target className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">
-                  Nenhuma meta definida
-                </p>
-                <Link to="/goals">
-                  <Button>Criar primeira meta</Button>
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {goals.slice(0, 3).map((goal) => {
-                  const progress = (goal.current_amount / goal.target_amount) * 100;
+              <div className="space-y-3">
+                {upcomingInstallments.map((installment) => {
+                  const debt = debts.find(d => d.id === installment.debt_id);
+                  const daysUntilDue = Math.ceil(
+                    (new Date(installment.due_date).getTime() - new Date().getTime()) / 
+                    (1000 * 3600 * 24)
+                  );
+                  
                   return (
-                    <div key={goal.id} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <p className="font-medium text-sm">{goal.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {progress.toFixed(1)}%
+                    <div key={installment.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div>
+                        <p className="font-medium">{debt?.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Parcela {installment.installment_number} • 
+                          {daysUntilDue === 0 ? ' Vence hoje' : 
+                           daysUntilDue === 1 ? ' Vence amanhã' : 
+                           ` Vence em ${daysUntilDue} dias`}
                         </p>
                       </div>
-                      <div className="w-full bg-muted rounded-full h-2">
-                        <div
-                          className="bg-secondary h-2 rounded-full transition-all"
-                          style={{ width: `${Math.min(progress, 100)}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{formatCurrency(goal.current_amount)}</span>
-                        <span>{formatCurrency(goal.target_amount)}</span>
+                      <div className="text-right">
+                        <p className="font-semibold">{formatCurrency(installment.amount)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(installment.due_date).toLocaleDateString('pt-BR')}
+                        </p>
                       </div>
                     </div>
                   );
                 })}
-                <Link to="/goals">
-                  <Button variant="outline" className="w-full">
-                    Ver todas as metas
-                  </Button>
-                </Link>
               </div>
             )}
           </CardContent>
         </Card>
+
+        {/* Ações rápidas */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Ações Rápidas
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Link to="/debts?tab=add-debt" className="block">
+              <Button className="w-full justify-start" variant="outline">
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Dívida
+              </Button>
+            </Link>
+            <Link to="/finances?tab=add-transaction" className="block">
+              <Button className="w-full justify-start" variant="outline">
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Nova Transação
+              </Button>
+            </Link>
+            <Link to="/reports" className="block">
+              <Button className="w-full justify-start" variant="outline">
+                <Bell className="h-4 w-4 mr-2" />
+                Ver Relatórios
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Link to="/finances">
-          <Card className="cursor-pointer hover:shadow-md transition-shadow">
-            <CardContent className="flex flex-col items-center justify-center p-6">
-              <Plus className="w-8 h-8 text-primary mb-2" />
-              <p className="text-sm font-medium text-center">Nova Transação</p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link to="/reports">
-          <Card className="cursor-pointer hover:shadow-md transition-shadow">
-            <CardContent className="flex flex-col items-center justify-center p-6">
-              <BarChart3 className="w-8 h-8 text-primary mb-2" />
-              <p className="text-sm font-medium text-center">Relatórios</p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link to="/goals">
-          <Card className="cursor-pointer hover:shadow-md transition-shadow">
-            <CardContent className="flex flex-col items-center justify-center p-6">
-              <Target className="w-8 h-8 text-primary mb-2" />
-              <p className="text-sm font-medium text-center">Metas</p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link to="/notifications">
-          <Card className="cursor-pointer hover:shadow-md transition-shadow">
-            <CardContent className="flex flex-col items-center justify-center p-6 relative">
-              <Bell className="w-8 h-8 text-primary mb-2" />
-              <p className="text-sm font-medium text-center">Notificações</p>
-              {unreadNotifications.length > 0 && (
-                <span className="absolute top-2 right-2 w-5 h-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
-                  {unreadNotifications.length}
-                </span>
-              )}
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
+      {/* Dívidas recentes */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Suas Dívidas</CardTitle>
+          <Link to="/debts">
+            <Button variant="outline" size="sm">
+              Gerenciar Todas
+            </Button>
+          </Link>
+        </CardHeader>
+        <CardContent>
+          <DebtListWithDetails
+            debts={debts.slice(0, 3)}
+            installments={installments}
+            loading={loading}
+            onEditDebt={() => {}}
+            onDeleteDebt={() => {}}
+          />
+          
+          {debts.length === 0 && !loading && (
+            <div className="text-center py-8">
+              <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">Comece a controlar suas dívidas</h3>
+              <p className="text-muted-foreground mb-4">
+                Cadastre suas dívidas e tenha controle total das suas finanças.
+              </p>
+              <Link to="/debts?tab=add-debt">
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Cadastrar Primeira Dívida
+                </Button>
+              </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
