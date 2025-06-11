@@ -33,8 +33,8 @@ export const useLazyFinancial = () => {
 
 export const LazyFinancialProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const { transactions, goals, notifications, setTransactions, setGoals, setNotifications } = useFinancial();
-  const { debts, setDebts } = useDebt();
+  const financial = useFinancial();
+  const debt = useDebt();
   
   const [loadingState, setLoadingState] = useState<LazyLoadingState>({
     userDataLoaded: false,
@@ -61,7 +61,9 @@ export const LazyFinancialProvider: React.FC<{ children: React.ReactNode }> = ({
       .order('date', { ascending: false });
 
     if (error) throw error;
-    setTransactions(data || []);
+    if ('setTransactions' in financial) {
+      (financial as any).setTransactions(data || []);
+    }
   };
 
   const fetchGoals = async () => {
@@ -74,7 +76,9 @@ export const LazyFinancialProvider: React.FC<{ children: React.ReactNode }> = ({
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    setGoals(data || []);
+    if ('setGoals' in financial) {
+      (financial as any).setGoals(data || []);
+    }
   };
 
   const fetchNotifications = async () => {
@@ -87,7 +91,9 @@ export const LazyFinancialProvider: React.FC<{ children: React.ReactNode }> = ({
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    setNotifications(data || []);
+    if ('setNotifications' in financial) {
+      (financial as any).setNotifications(data || []);
+    }
   };
 
   const fetchDebts = async () => {
@@ -100,7 +106,9 @@ export const LazyFinancialProvider: React.FC<{ children: React.ReactNode }> = ({
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    setDebts(data || []);
+    if ('setDebts' in debt) {
+      (debt as any).setDebts(data || []);
+    }
   };
 
   const loadSection = async (section: string, loadFunction: () => Promise<void>) => {
