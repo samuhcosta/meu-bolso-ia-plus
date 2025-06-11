@@ -14,10 +14,13 @@ const Debts = () => {
   const { debts, installments, loading, deleteDebt } = useDebt();
   const { toast } = useToast();
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
-  const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
 
   const handleEditDebt = (debt: Debt) => {
-    setEditingDebt(debt);
+    // For now, we'll just show a toast. The edit functionality can be added later
+    toast({
+      title: "Editar dívida",
+      description: "Funcionalidade de edição será implementada em breve.",
+    });
   };
 
   const handleDeleteDebt = async (debtId: string) => {
@@ -35,13 +38,6 @@ const Debts = () => {
           variant: "destructive",
         });
       }
-    }
-  };
-
-  const handleSelectDebt = (debtId: string) => {
-    const debt = debts.find(d => d.id === debtId);
-    if (debt) {
-      setSelectedDebt(debt);
     }
   };
 
@@ -72,7 +68,6 @@ const Debts = () => {
             loading={loading}
           />
           
-          {/* Preview das dívidas mais próximas do vencimento */}
           <div className="mt-6">
             <h3 className="text-lg font-semibold mb-4">Dívidas Recentes</h3>
             <DebtListWithDetails
@@ -86,10 +81,7 @@ const Debts = () => {
         </TabsContent>
 
         <TabsContent value="add-debt" className="space-y-6">
-          <DebtForm 
-            editingDebt={editingDebt} 
-            onEditComplete={() => setEditingDebt(null)} 
-          />
+          <DebtForm />
         </TabsContent>
 
         <TabsContent value="list" className="space-y-6">
