@@ -4,10 +4,16 @@ import { Loader2, DollarSign } from 'lucide-react';
 
 interface LoadingScreenProps {
   message?: string;
+  showRetryInfo?: boolean;
+  currentRetry?: number;
+  maxRetries?: number;
 }
 
 const LoadingScreen: React.FC<LoadingScreenProps> = ({ 
-  message = "Carregando..." 
+  message = "Carregando...",
+  showRetryInfo = false,
+  currentRetry = 0,
+  maxRetries = 3
 }) => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-secondary/5">
@@ -23,6 +29,12 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
           <Loader2 className="w-6 h-6 text-primary animate-spin" />
           <p className="text-lg text-muted-foreground">{message}</p>
         </div>
+        
+        {showRetryInfo && currentRetry > 0 && (
+          <div className="text-sm text-muted-foreground">
+            Tentando novamente... tentativa {currentRetry}/{maxRetries}
+          </div>
+        )}
         
         <div className="w-64 h-1 bg-muted rounded-full mx-auto overflow-hidden">
           <div className="w-full h-full bg-gradient-to-r from-primary to-secondary animate-pulse"></div>

@@ -34,14 +34,28 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading, error } = useAuth();
+  const { user, isLoading, error, retryCount, maxRetries, retryAuth } = useAuth();
   
   if (isLoading) {
-    return <LoadingScreen message="Verificando suas informações..." />;
+    return (
+      <LoadingScreen 
+        message="Verificando suas informações..." 
+        showRetryInfo={retryCount > 0}
+        currentRetry={retryCount}
+        maxRetries={maxRetries}
+      />
+    );
   }
 
   if (error) {
-    return <ErrorScreen error={error} />;
+    return (
+      <ErrorScreen 
+        error={error} 
+        onRetry={retryAuth}
+        retryCount={retryCount}
+        maxRetries={maxRetries}
+      />
+    );
   }
   
   if (!user) {
@@ -52,14 +66,28 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading, error } = useAuth();
+  const { user, isLoading, error, retryCount, maxRetries, retryAuth } = useAuth();
   
   if (isLoading) {
-    return <LoadingScreen message="Carregando..." />;
+    return (
+      <LoadingScreen 
+        message="Carregando..." 
+        showRetryInfo={retryCount > 0}
+        currentRetry={retryCount}
+        maxRetries={maxRetries}
+      />
+    );
   }
 
   if (error) {
-    return <ErrorScreen error={error} />;
+    return (
+      <ErrorScreen 
+        error={error} 
+        onRetry={retryAuth}
+        retryCount={retryCount}
+        maxRetries={maxRetries}
+      />
+    );
   }
   
   if (user) {

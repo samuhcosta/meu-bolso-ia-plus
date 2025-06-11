@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
@@ -24,6 +25,9 @@ interface AuthContextType {
   requestPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
   resetPassword: (token: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
   error: string | null;
+  retryCount: number;
+  maxRetries: number;
+  retryAuth: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,61 +44,120 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
+
+  // Timeout utility with AbortController
+  const createTimeoutPromise = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+    const controller = new AbortController();
+    
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        controller.abort();
+        reject(new Error(`Operação excedeu ${timeoutMs/1000}s`));
+      }, timeoutMs);
+    });
+
+    return Promise.race([promise, timeoutPromise]);
+  };
+
+  const initializeAuth = async (attempt: number = 1) => {
+    try {
+      console.log(`Tentativa ${attempt}/${maxRetries} - Inicializando autenticação...`);
+      setIsLoading(true);
+      setError(null);
+
+      // Verificar sessão com timeout de 8 segundos
+      const sessionPromise = supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await createTimeoutPromise(sessionPromise, 8000);
+      
+      if (sessionError) {
+        console.error('Erro na sessão:', sessionError);
+        throw new Error('Erro ao verificar sessão');
+      }
+
+      console.log('Sessão verificada com sucesso:', !!session);
+      
+      if (session?.user) {
+        await loadUserProfile(session.user, attempt);
+      } else {
+        console.log('Nenhuma sessão ativa, usuário não logado');
+        setIsLoading(false);
+      }
+
+    } catch (error) {
+      console.error(`Tentativa ${attempt} falhou:`, error);
+      
+      if (attempt < maxRetries) {
+        console.log(`Tentando novamente... tentativa ${attempt + 1}/${maxRetries}`);
+        setRetryCount(attempt);
+        setTimeout(() => initializeAuth(attempt + 1), 2000);
+      } else {
+        console.error('Falha final no carregamento');
+        setError('Não foi possível carregar. Verifique sua conexão.');
+        setIsLoading(false);
+        setRetryCount(maxRetries);
+      }
+    }
+  };
+
+  const loadUserProfile = async (authUser: User, attempt: number = 1) => {
+    try {
+      console.log('Iniciando carregamento de dados do usuário...');
+      
+      // Carregar perfil com timeout de 5 segundos
+      const profilePromise = supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+        
+      const { data: profile, error } = await createTimeoutPromise(profilePromise, 5000);
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Erro ao carregar perfil:', error);
+        // Não falhar completamente, usar dados básicos
+      }
+
+      const userData = {
+        id: authUser.id,
+        name: profile?.name || authUser.user_metadata?.name || 'Usuário',
+        email: authUser.email || '',
+        whatsapp: profile?.whatsapp || '',
+        plan: 'free'
+      };
+
+      setUser(userData);
+      setError(null);
+      setRetryCount(0);
+      console.log('Dados do usuário carregados com sucesso');
+      
+    } catch (error) {
+      console.error('Erro ao carregar perfil do usuário:', error);
+      
+      // Usar dados mínimos em caso de erro
+      setUser({
+        id: authUser.id,
+        name: authUser.user_metadata?.name || 'Usuário',
+        email: authUser.email || '',
+        plan: 'free'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const retryAuth = () => {
+    setRetryCount(0);
+    initializeAuth(1);
+  };
 
   useEffect(() => {
     let mounted = true;
-    let timeoutId: NodeJS.Timeout;
 
-    const initializeAuth = async () => {
-      try {
-        console.log('Initializing auth...');
-        
-        // Set timeout for loading state
-        timeoutId = setTimeout(() => {
-          if (mounted) {
-            console.warn('Auth initialization timeout');
-            setError('Tempo limite excedido ao carregar. Tente recarregar a página.');
-            setIsLoading(false);
-          }
-        }, 5000);
-
-        // Get initial session
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('Session error:', sessionError);
-          if (mounted) {
-            setError('Erro ao verificar sessão. Tente fazer login novamente.');
-            setIsLoading(false);
-          }
-          return;
-        }
-
-        console.log('Initial session:', session);
-        
-        if (session?.user && mounted) {
-          await loadUserProfile(session.user);
-        } else if (mounted) {
-          setIsLoading(false);
-        }
-
-        // Clear timeout if we got here successfully
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
-
-      } catch (error) {
-        console.error('Auth initialization error:', error);
-        if (mounted) {
-          setError('Erro de conexão. Verifique sua internet e tente novamente.');
-          setIsLoading(false);
-        }
-      }
-    };
-
-    // Set up auth state listener
+    // Set up auth state listener primeiro
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state change:', event, session?.user?.id);
+      console.log('Mudança no estado de autenticação:', event, session?.user?.id);
       
       if (!mounted) return;
 
@@ -107,78 +170,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsLoading(false);
         }
       } catch (error) {
-        console.error('Auth state change error:', error);
-        setError('Erro ao processar mudança de autenticação.');
+        console.error('Erro na mudança do estado de auth:', error);
+        setError('Erro ao processar autenticação');
         setIsLoading(false);
       }
     });
 
-    // Initialize auth
-    initializeAuth();
+    // Inicializar auth
+    initializeAuth(1);
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
     };
   }, []);
-
-  const loadUserProfile = async (authUser: User) => {
-    try {
-      console.log('Loading profile for user:', authUser.id);
-      
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading profile:', error);
-        // Don't set as critical error, use default values
-      }
-
-      setUser({
-        id: authUser.id,
-        name: profile?.name || authUser.user_metadata?.name || 'Usuário',
-        email: authUser.email || '',
-        whatsapp: profile?.whatsapp || '',
-        plan: 'free' // Default plan
-      });
-      
-      setError(null);
-    } catch (error) {
-      console.error('Error loading user profile:', error);
-      // Set user with minimal data instead of failing completely
-      setUser({
-        id: authUser.id,
-        name: authUser.user_metadata?.name || 'Usuário',
-        email: authUser.email || '',
-        plan: 'free'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
     setError(null);
     
     try {
-      console.log('Attempting login for:', email);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      console.log('Tentando login para:', email);
+      
+      const loginPromise = supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await createTimeoutPromise(loginPromise, 10000);
 
       if (error) {
-        console.error('Login error:', error);
+        console.error('Erro no login:', error);
         setIsLoading(false);
         
-        // Tratar diferentes tipos de erro
         if (error.message.includes('Invalid login credentials')) {
           return { success: false, error: 'Email ou senha incorretos.' };
         } else if (error.message.includes('Email not confirmed')) {
@@ -188,12 +208,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      console.log('Login successful:', data);
+      console.log('Login realizado com sucesso');
       return { success: true };
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Erro no login:', error);
       setIsLoading(false);
-      return { success: false, error: 'Erro interno. Tente novamente.' };
+      return { success: false, error: 'Tempo limite excedido. Tente novamente.' };
     }
   };
 
@@ -202,22 +222,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      console.log('Attempting registration for:', email);
+      console.log('Tentando registro para:', email);
       
-      // Disable email confirmation for immediate login
-      const { data, error } = await supabase.auth.signUp({
+      const registerPromise = supabase.auth.signUp({
         email,
         password,
         options: {
-          data: {
-            name: name
-          },
+          data: { name: name },
           emailRedirectTo: `${window.location.origin}/dashboard`
         }
       });
+      
+      const { data, error } = await createTimeoutPromise(registerPromise, 10000);
 
       if (error) {
-        console.error('Registration error:', error);
+        console.error('Erro no registro:', error);
         setIsLoading(false);
         
         if (error.message.includes('User already registered')) {
@@ -227,7 +246,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Update profile with additional data if user was created
       if (data.user && whatsapp) {
         await supabase
           .from('profiles')
@@ -235,12 +253,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .eq('id', data.user.id);
       }
 
-      console.log('Registration successful:', data);
+      console.log('Registro realizado com sucesso');
       return { success: true };
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('Erro no registro:', error);
       setIsLoading(false);
-      return { success: false, error: 'Erro interno. Tente novamente.' };
+      return { success: false, error: 'Tempo limite excedido. Tente novamente.' };
     }
   };
 
@@ -250,8 +268,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setError(null);
     } catch (error) {
-      console.error('Logout error:', error);
-      // Force logout locally even if API fails
+      console.error('Erro no logout:', error);
       setUser(null);
       setError(null);
     }
@@ -261,27 +278,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return;
 
     try {
-      const { error } = await supabase
+      const updatePromise = supabase
         .from('profiles')
         .update(userData)
         .eq('id', user.id);
+        
+      const { error } = await createTimeoutPromise(updatePromise, 5000);
 
       if (error) {
-        console.error('Error updating profile:', error);
+        console.error('Erro ao atualizar perfil:', error);
         return;
       }
 
       setUser({ ...user, ...userData });
     } catch (error) {
-      console.error('Error updating user:', error);
+      console.error('Erro ao atualizar usuário:', error);
     }
   };
 
   const requestPasswordReset = async (email: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      console.log('Requesting password reset for:', email);
+      console.log('Solicitando reset de senha para:', email);
       
-      // First check if email exists in our database
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, email')
@@ -292,12 +310,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: 'E-mail não encontrado em nossa base.' };
       }
 
-      // Generate reset token and expiration
       const resetToken = crypto.randomUUID();
       const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 1); // 1 hour from now
+      expiresAt.setHours(expiresAt.getHours() + 1);
 
-      // Store token in profile
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ 
@@ -307,26 +323,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('email', email);
 
       if (updateError) {
-        console.error('Error storing reset token:', updateError);
+        console.error('Erro ao salvar token de reset:', updateError);
         return { success: false, error: 'Erro interno. Tente novamente.' };
       }
 
-      // For now, we'll just log the reset link since we don't have email sending configured
       const resetLink = `${window.location.origin}/reset-password?token=${resetToken}`;
-      console.log('Password reset link:', resetLink);
+      console.log('Link de reset de senha:', resetLink);
       
       return { success: true };
     } catch (error) {
-      console.error('Password reset request error:', error);
+      console.error('Erro na solicitação de reset:', error);
       return { success: false, error: 'Erro interno. Tente novamente.' };
     }
   };
 
   const resetPassword = async (token: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      console.log('Resetting password with token:', token);
+      console.log('Redefinindo senha com token:', token);
       
-      // Find profile with valid token
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, email, reset_token_expires_at')
@@ -337,7 +351,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: 'Token de redefinição inválido.' };
       }
 
-      // Check if token is expired
       const now = new Date();
       const expiresAt = new Date(profile.reset_token_expires_at!);
       
@@ -345,18 +358,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: 'Este link expirou. Solicite uma nova redefinição.' };
       }
 
-      // Reset password using Supabase admin function (this would need to be done via edge function in production)
-      // For now, we'll use the auth.updateUser method with the user's session
       const { error: resetError } = await supabase.auth.updateUser({
         password: newPassword
       });
 
       if (resetError) {
-        console.error('Error resetting password:', resetError);
+        console.error('Erro ao redefinir senha:', resetError);
         return { success: false, error: 'Erro ao redefinir senha. Tente novamente.' };
       }
 
-      // Clear reset token
       await supabase
         .from('profiles')
         .update({ 
@@ -367,7 +377,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { success: true };
     } catch (error) {
-      console.error('Password reset error:', error);
+      console.error('Erro no reset de senha:', error);
       return { success: false, error: 'Erro interno. Tente novamente.' };
     }
   };
@@ -381,7 +391,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     updateUser,
     requestPasswordReset,
     resetPassword,
-    error
+    error,
+    retryCount,
+    maxRetries,
+    retryAuth
   };
 
   return (

@@ -2,6 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFinancial } from '@/contexts/FinancialContext';
 import { 
@@ -13,7 +14,8 @@ import {
   Bot,
   Plus,
   Bell,
-  BarChart3
+  BarChart3,
+  RefreshCw
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -58,6 +60,20 @@ const Dashboard = () => {
   const aiSuggestion = monthlyExpenses > 0 
     ? `Você gastou ${formatCurrency(monthlyExpenses)} este mês. Que tal definir uma meta de economia para o próximo mês?`
     : "Comece adicionando suas primeiras transações para receber dicas personalizadas!";
+
+  // Skeleton para carregamento
+  const SkeletonCard = () => (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-4 w-4" />
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="h-8 w-32 mb-2" />
+        <Skeleton className="h-3 w-20" />
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="space-y-6">
