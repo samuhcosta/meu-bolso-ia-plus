@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { useFinancial } from './FinancialContext';
 import { useDebt } from './DebtContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface LazyLoadingState {
   userDataLoaded: boolean;
@@ -32,8 +33,8 @@ export const useLazyFinancial = () => {
 
 export const LazyFinancialProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const { transactions, goals, notifications, fetchTransactions, fetchGoals, fetchNotifications } = useFinancial();
-  const { debts, fetchDebts } = useDebt();
+  const { transactions, goals, notifications, setTransactions, setGoals, setNotifications } = useFinancial();
+  const { debts, setDebts } = useDebt();
   
   const [loadingState, setLoadingState] = useState<LazyLoadingState>({
     userDataLoaded: false,
@@ -47,6 +48,59 @@ export const LazyFinancialProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const updateLoadingState = (updates: Partial<LazyLoadingState>) => {
     setLoadingState(prev => ({ ...prev, ...updates }));
+  };
+
+  // Funções para carregar dados individualmente
+  const fetchTransactions = async () => {
+    if (!user) return;
+    
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false });
+
+    if (error) throw error;
+    setTransactions(data || []);
+  };
+
+  const fetchGoals = async () => {
+    if (!user) return;
+    
+    const { data, error } = await supabase
+      .from('goals')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    setGoals(data || []);
+  };
+
+  const fetchNotifications = async () => {
+    if (!user) return;
+    
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    setNotifications(data || []);
+  };
+
+  const fetchDebts = async () => {
+    if (!user) return;
+    
+    const { data, error } = await supabase
+      .from('debts')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    setDebts(data || []);
   };
 
   const loadSection = async (section: string, loadFunction: () => Promise<void>) => {
