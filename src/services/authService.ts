@@ -100,11 +100,13 @@ export const requestPasswordReset = async (email: string): Promise<{ success: bo
   try {
     console.log('Solicitando reset de senha para:', email);
     
-    const { data: profile, error: profileError } = await supabase
+    const profilePromise = supabase
       .from('profiles')
       .select('id, email')
       .eq('email', email)
       .single();
+
+    const { data: profile, error: profileError } = await createTimeoutPromise(profilePromise, 5000);
 
     if (profileError || !profile) {
       return { success: false, error: 'E-mail não encontrado em nossa base.' };
@@ -114,13 +116,15 @@ export const requestPasswordReset = async (email: string): Promise<{ success: bo
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 1);
 
-    const { error: updateError } = await supabase
+    const updatePromise = supabase
       .from('profiles')
       .update({ 
         reset_token: resetToken,
         reset_token_expires_at: expiresAt.toISOString()
       })
       .eq('email', email);
+
+    const { error: updateError } = await createTimeoutPromise(updatePromise, 5000);
 
     if (updateError) {
       console.error('Erro ao salvar token de reset:', updateError);
@@ -141,11 +145,13 @@ export const resetPassword = async (token: string, newPassword: string): Promise
   try {
     console.log('Redefinindo senha com token:', token);
     
-    const { data: profile, error: profileError } = await supabase
+    const profilePromise = supabase
       .from('profiles')
       .select('id, email, reset_token_expires_at')
       .eq('reset_token', token)
       .single();
+
+    const { data: profile, error: profileError } = await createTimeoutPromise(profilePromise, 5000);
 
     if (profileError || !profile) {
       return { success: false, error: 'Token de redefinição inválido.' };

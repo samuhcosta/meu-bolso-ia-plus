@@ -30,7 +30,7 @@ export const useAuthState = () => {
       console.log('Sessão verificada com sucesso:', !!session);
       
       if (session?.user) {
-        const userData = await loadUserProfile(session.user, attempt);
+        const userData = await loadUserProfile(session.user);
         setUser(userData);
         setError(null);
         setRetryCount(0);
