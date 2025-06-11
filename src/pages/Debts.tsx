@@ -8,7 +8,7 @@ import DebtDashboardCards from '@/components/debt/DebtDashboardCards';
 import DebtListWithDetails from '@/components/debt/DebtListWithDetails';
 import DebtInstallmentsView from '@/components/debt/DebtInstallmentsView';
 import DebtReports from '@/components/debt/DebtReports';
-import { Debt } from '@/contexts/DebtContext';
+import { Debt } from '@/types/debt';
 
 const Debts = () => {
   const { debts, installments, loading, deleteDebt } = useDebt();
@@ -86,7 +86,10 @@ const Debts = () => {
         </TabsContent>
 
         <TabsContent value="add-debt" className="space-y-6">
-          <DebtForm editingDebt={editingDebt} onEditComplete={() => setEditingDebt(null)} />
+          <DebtForm 
+            editingDebt={editingDebt} 
+            onEditComplete={() => setEditingDebt(null)} 
+          />
         </TabsContent>
 
         <TabsContent value="list" className="space-y-6">
