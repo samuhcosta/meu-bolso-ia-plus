@@ -21,15 +21,15 @@ export const loadUserProfile = async (authUser: User): Promise<UserProfile> => {
   try {
     console.log('👤 Profile - Iniciando carregamento do perfil do usuário:', authUser.id);
     
-    // Executar a query do Supabase diretamente com timeout
-    const { data: profile, error } = await createTimeoutPromise(
-      supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single(),
-      3000
-    );
+    // Executar a query do Supabase com timeout - primeiro executamos a query
+    const profilePromise = supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authUser.id)
+      .single();
+
+    const result = await createTimeoutPromise(profilePromise, 3000);
+    const { data: profile, error } = result;
 
     if (error && error.code !== 'PGRST116') {
       console.warn('⚠️ Profile - Erro ao carregar perfil (usando dados básicos):', error.message);
