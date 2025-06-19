@@ -21,12 +21,13 @@ export const loadUserProfile = async (authUser: User): Promise<UserProfile> => {
   try {
     console.log('👤 Profile - Iniciando carregamento do perfil do usuário:', authUser.id);
     
-    // Executar a query do Supabase com timeout - primeiro criamos a Promise executando a query
+    // Executar a query do Supabase com timeout - criar Promise executando a query
     const profileQueryPromise = supabase
       .from('profiles')
       .select('*')
       .eq('id', authUser.id)
-      .single();
+      .single()
+      .then(result => result); // Execute the query to get a Promise
 
     const { data: profile, error } = await createTimeoutPromise(profileQueryPromise, 3000);
 
