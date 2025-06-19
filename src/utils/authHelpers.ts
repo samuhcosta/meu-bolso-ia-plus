@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { UserProfile } from '@/types/auth';
@@ -20,14 +21,14 @@ export const loadUserProfile = async (authUser: User): Promise<UserProfile> => {
   try {
     console.log('👤 Profile - Iniciando carregamento do perfil do usuário:', authUser.id);
     
-    // Executar a query do Supabase com timeout - executar a query como Promise
-    const profileQuery = supabase
+    // Executar a query do Supabase com timeout - primeiro criamos a Promise executando a query
+    const profileQueryPromise = supabase
       .from('profiles')
       .select('*')
       .eq('id', authUser.id)
       .single();
 
-    const { data: profile, error } = await createTimeoutPromise(profileQuery, 3000);
+    const { data: profile, error } = await createTimeoutPromise(profileQueryPromise, 3000);
 
     if (error && error.code !== 'PGRST116') {
       console.warn('⚠️ Profile - Erro ao carregar perfil (usando dados básicos):', error.message);
