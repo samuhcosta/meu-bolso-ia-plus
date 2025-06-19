@@ -3,14 +3,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { UserProfile } from '@/types/auth';
 
-// Timeout utility with AbortController
+// Timeout utility com AbortController melhorado
 export const createTimeoutPromise = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
   const controller = new AbortController();
   
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => {
       controller.abort();
-      reject(new Error(`Operação excedeu ${timeoutMs/1000}s`));
+      reject(new Error(`Timeout: Operação excedeu ${timeoutMs/1000}s`));
     }, timeoutMs);
   });
 
@@ -19,21 +19,24 @@ export const createTimeoutPromise = <T,>(promise: Promise<T>, timeoutMs: number)
 
 export const loadUserProfile = async (authUser: User): Promise<UserProfile> => {
   try {
-    console.log('Iniciando carregamento de dados do usuário...');
+    console.log('👤 Profile - Iniciando carregamento do perfil do usuário:', authUser.id);
     
-    // Carregar perfil com timeout de 5 segundos
-    const { data: profile, error } = await supabase
+    // Timeout reduzido para 3 segundos
+    const profilePromise = supabase
       .from('profiles')
       .select('*')
       .eq('id', authUser.id)
       .single();
 
+    const { data: profile, error } = await createTimeoutPromise(profilePromise, 3000);
+
     if (error && error.code !== 'PGRST116') {
-      console.error('Erro ao carregar perfil:', error);
-      // Não falhar completamente, usar dados básicos
+      console.warn('⚠️ Profile - Erro ao carregar perfil (usando dados básicos):', error.message);
+    } else if (profile) {
+      console.log('✅ Profile - Perfil carregado do banco:', profile.name);
     }
 
-    const userData = {
+    const userData: UserProfile = {
       id: authUser.id,
       name: profile?.name || authUser.user_metadata?.name || 'Usuário',
       email: authUser.email || '',
@@ -41,18 +44,26 @@ export const loadUserProfile = async (authUser: User): Promise<UserProfile> => {
       plan: 'free'
     };
 
-    console.log('Dados do usuário carregados com sucesso');
+    console.log('✅ Profile - Dados do usuário finalizados:', {
+      id: userData.id,
+      name: userData.name,
+      email: userData.email
+    });
+    
     return userData;
     
-  } catch (error) {
-    console.error('Erro ao carregar perfil do usuário:', error);
+  } catch (error: any) {
+    console.error('❌ Profile - Erro ao carregar perfil, usando dados mínimos:', error.message);
     
-    // Usar dados mínimos em caso de erro
-    return {
+    // Dados de fallback em caso de erro
+    const fallbackData: UserProfile = {
       id: authUser.id,
-      name: authUser.user_metadata?.name || 'Usuário',
+      name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Usuário',
       email: authUser.email || '',
       plan: 'free'
     };
+
+    console.log('🔄 Profile - Usando dados de fallback:', fallbackData);
+    return fallbackData;
   }
 };

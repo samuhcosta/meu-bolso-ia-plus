@@ -10,47 +10,51 @@ export const useAuthState = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [loadingTimeout, setLoadingTimeout] = useState<NodeJS.Timeout | null>(null);
   const maxRetries = 3;
 
   const initializeAuth = async (attempt: number = 1) => {
     try {
-      console.log(`Tentativa ${attempt}/${maxRetries} - Inicializando autenticação...`);
+      console.log(`🔐 Auth - Tentativa ${attempt}/${maxRetries} - Inicializando autenticação...`);
       setIsLoading(true);
       setError(null);
 
-      // Verificar sessão com timeout de 8 segundos
+      // Timeout reduzido para 5 segundos
+      console.log('🔍 Auth - Verificando sessão existente...');
       const sessionPromise = supabase.auth.getSession();
-      const { data: { session }, error: sessionError } = await createTimeoutPromise(sessionPromise, 8000);
+      const { data: { session }, error: sessionError } = await createTimeoutPromise(sessionPromise, 5000);
       
       if (sessionError) {
-        console.error('Erro na sessão:', sessionError);
-        throw new Error('Erro ao verificar sessão');
+        console.error('❌ Auth - Erro na verificação de sessão:', sessionError);
+        throw new Error(`Erro ao verificar sessão: ${sessionError.message}`);
       }
 
-      console.log('Sessão verificada com sucesso:', !!session);
+      console.log('✅ Auth - Sessão verificada:', !!session?.user);
       
       if (session?.user) {
+        console.log('👤 Auth - Carregando dados do usuário...');
         const userData = await loadUserProfile(session.user);
+        console.log('✅ Auth - Dados do usuário carregados:', userData.name);
         setUser(userData);
         setError(null);
         setRetryCount(0);
       } else {
-        console.log('Nenhuma sessão ativa, usuário não logado');
+        console.log('ℹ️ Auth - Nenhuma sessão ativa encontrada');
         setUser(null);
       }
       
       setIsLoading(false);
 
-    } catch (error) {
-      console.error(`Tentativa ${attempt} falhou:`, error);
+    } catch (error: any) {
+      console.error(`❌ Auth - Tentativa ${attempt} falhou:`, error.message);
       
       if (attempt < maxRetries) {
-        console.log(`Tentando novamente... tentativa ${attempt + 1}/${maxRetries}`);
+        console.log(`🔄 Auth - Tentando novamente em 1 segundo... (${attempt + 1}/${maxRetries})`);
         setRetryCount(attempt);
-        setTimeout(() => initializeAuth(attempt + 1), 2000);
+        setTimeout(() => initializeAuth(attempt + 1), 1000);
       } else {
-        console.error('Falha final no carregamento');
-        setError('Não foi possível carregar. Verifique sua conexão.');
+        console.error('💥 Auth - Todas as tentativas falharam');
+        setError('Não foi possível carregar os dados do servidor. Tente novamente em alguns minutos.');
         setIsLoading(false);
         setRetryCount(maxRetries);
       }
@@ -58,26 +62,30 @@ export const useAuthState = () => {
   };
 
   const retryAuth = () => {
+    console.log('🔄 Auth - Retry manual iniciado pelo usuário');
     setRetryCount(0);
     initializeAuth(1);
   };
 
   const handleAuthStateChange = async (event: string, session: any) => {
-    console.log('Mudança no estado de autenticação:', event, session?.user?.id);
+    console.log('🔄 Auth - Mudança no estado detectada:', event, session?.user?.id);
     
     try {
       if (session?.user) {
+        console.log('👤 Auth - Carregando dados após mudança de estado...');
         const userData = await loadUserProfile(session.user);
+        console.log('✅ Auth - Dados atualizados:', userData.name);
         setUser(userData);
         setError(null);
       } else {
+        console.log('👋 Auth - Usuário deslogado');
         setUser(null);
         setError(null);
       }
       setIsLoading(false);
-    } catch (error) {
-      console.error('Erro na mudança do estado de auth:', error);
-      setError('Erro ao processar autenticação');
+    } catch (error: any) {
+      console.error('❌ Auth - Erro na mudança do estado:', error.message);
+      setError('Erro ao processar mudança de autenticação');
       setIsLoading(false);
     }
   };
@@ -85,17 +93,35 @@ export const useAuthState = () => {
   useEffect(() => {
     let mounted = true;
 
-    // Set up auth state listener primeiro
+    console.log('🚀 Auth - Inicializando sistema de autenticação...');
+
+    // Timeout de segurança de 15 segundos
+    const timeout = setTimeout(() => {
+      if (mounted && isLoading) {
+        console.warn('⏰ Auth - Timeout de 15s atingido, forçando fim do loading');
+        setError('Conexão demorou muito para responder. Tente recarregar a página.');
+        setIsLoading(false);
+      }
+    }, 15000);
+
+    setLoadingTimeout(timeout);
+
+    // Setup do listener de mudanças de auth
+    console.log('📡 Auth - Configurando listener de mudanças...');
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
 
-    // Inicializar auth
+    // Inicializar verificação de auth
     if (mounted) {
       initializeAuth(1);
     }
 
     return () => {
+      console.log('🧹 Auth - Limpando recursos...');
       mounted = false;
       subscription.unsubscribe();
+      if (timeout) {
+        clearTimeout(timeout);
+      }
     };
   }, []);
 
