@@ -7,19 +7,9 @@ import FinancialSummaryCards from '@/components/dashboard/FinancialSummaryCards'
 import DebtsSummaryCard from '@/components/dashboard/DebtsSummaryCard';
 import MonthlyFlowChart from '@/components/dashboard/MonthlyFlowChart';
 import EmptyStateCard from '@/components/dashboard/EmptyStateCard';
+import SectionErrorFallback from '@/components/dashboard/SectionErrorFallback';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBoundary from '@/components/ErrorBoundary';
-
-const SectionErrorFallback: React.FC<{ sectionName: string }> = ({ sectionName }) => (
-  <div className="border border-red-200 rounded-lg p-6">
-    <div className="flex items-center justify-center space-x-2 text-red-600">
-      <span>Erro ao carregar {sectionName}</span>
-    </div>
-    <p className="text-sm text-muted-foreground text-center mt-2">
-      Esta seção não pôde ser carregada, mas o resto do dashboard está funcionando.
-    </p>
-  </div>
-);
 
 const Dashboard = () => {
   const { user } = useAuth();
