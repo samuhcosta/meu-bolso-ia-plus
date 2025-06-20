@@ -1,48 +1,32 @@
 
 import React from 'react';
 import { useDebt } from '@/contexts/DebtContext';
+import { useFinancial } from '@/contexts/FinancialContext';
 import { useAuth } from '@/contexts/AuthContext';
-import DebtDashboardCards from '@/components/debt/DebtDashboardCards';
-import DebtListWithDetails from '@/components/debt/DebtListWithDetails';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
-import { Plus, TrendingUp, Calendar, Bell, AlertCircle } from 'lucide-react';
+import FinancialSummaryCards from '@/components/dashboard/FinancialSummaryCards';
+import DebtsSummaryCard from '@/components/dashboard/DebtsSummaryCard';
+import MonthlyFlowChart from '@/components/dashboard/MonthlyFlowChart';
+import EmptyStateCard from '@/components/dashboard/EmptyStateCard';
+import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 const SectionErrorFallback: React.FC<{ sectionName: string }> = ({ sectionName }) => (
-  <Card className="border-red-200">
-    <CardContent className="p-6">
-      <div className="flex items-center justify-center space-x-2 text-red-600">
-        <AlertCircle className="h-5 w-5" />
-        <span>Erro ao carregar {sectionName}</span>
-      </div>
-      <p className="text-sm text-muted-foreground text-center mt-2">
-        Esta seção não pôde ser carregada, mas o resto do dashboard está funcionando.
-      </p>
-    </CardContent>
-  </Card>
+  <div className="border border-red-200 rounded-lg p-6">
+    <div className="flex items-center justify-center space-x-2 text-red-600">
+      <span>Erro ao carregar {sectionName}</span>
+    </div>
+    <p className="text-sm text-muted-foreground text-center mt-2">
+      Esta seção não pôde ser carregada, mas o resto do dashboard está funcionando.
+    </p>
+  </div>
 );
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { debts, installments, loading } = useDebt();
+  const { debts, installments, loading: debtsLoading } = useDebt();
+  const { transactions, isLoading: financialLoading } = useFinancial();
 
   console.log('📊 Dashboard - Renderizando dashboard para:', user?.name);
-  console.log('📊 Dashboard - Dados:', { 
-    debtsCount: debts.length, 
-    installmentsCount: installments.length,
-    loading 
-  });
-
-  const upcomingInstallments = installments
-    .filter(installment => !installment.is_paid)
-    .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
-    .slice(0, 5);
-
-  const overdueInstallments = installments.filter(installment => 
-    !installment.is_paid && new Date(installment.due_date) < new Date()
-  );
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -51,158 +35,141 @@ const Dashboard = () => {
     }).format(value);
   };
 
+  // Calcular dados financeiros do mês atual
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
+
+  const currentMonthTransactions = transactions.filter(t => {
+    const transactionDate = new Date(t.date);
+    return transactionDate.getMonth() === currentMonth && 
+           transactionDate.getFullYear() === currentYear;
+  });
+
+  const totalIncome = currentMonthTransactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const totalExpenses = currentMonthTransactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const balance = totalIncome - totalExpenses;
+
+  // Dados para o gráfico dos últimos 3 meses
+  const getMonthlyData = () => {
+    const months = [];
+    for (let i = 2; i >= 0; i--) {
+      const date = new Date(currentYear, currentMonth - i, 1);
+      const monthTransactions = transactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        return transactionDate.getMonth() === date.getMonth() && 
+               transactionDate.getFullYear() === date.getFullYear();
+      });
+
+      const monthIncome = monthTransactions
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+
+      const monthExpenses = monthTransactions
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+
+      months.push({
+        month: date.toLocaleDateString('pt-BR', { month: 'short' }),
+        receitas: monthIncome,
+        despesas: monthExpenses
+      });
+    }
+    return months;
+  };
+
+  const monthlyData = getMonthlyData();
+  const hasTransactions = transactions.length > 0;
+  const hasDebts = debts.length > 0;
+  const isLoading = debtsLoading || financialLoading;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <div className="text-center space-y-2">
+          <Skeleton className="h-10 w-96 mx-auto" />
+          <Skeleton className="h-6 w-80 mx-auto" />
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
-      {/* Header de boas-vindas */}
+      {/* Header personalizado */}
       <ErrorBoundary fallback={<SectionErrorFallback sectionName="cabeçalho" />}>
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Bem-vindo ao Meu Bolso Pro
+            Meu Bolso Pro
           </h1>
           <p className="text-xl text-muted-foreground">
-            Olá, {user?.name}! Aqui está o resumo das suas finanças
+            Olá, {user?.name}! Aqui está um resumo da sua saúde financeira deste mês.
           </p>
         </div>
       </ErrorBoundary>
 
-      {/* Cards principais de dívidas */}
+      {/* Resumo Financeiro */}
       <ErrorBoundary fallback={<SectionErrorFallback sectionName="resumo financeiro" />}>
-        <DebtDashboardCards 
-          debts={debts} 
-          installments={installments}
-          loading={loading}
-        />
+        <div className="space-y-4">
+          <h2 className="text-2xl font-semibold">📊 Resumo Financeiro</h2>
+          {hasTransactions ? (
+            <FinancialSummaryCards
+              totalIncome={totalIncome}
+              totalExpenses={totalExpenses}
+              balance={balance}
+              formatCurrency={formatCurrency}
+            />
+          ) : (
+            <EmptyStateCard type="transactions" />
+          )}
+        </div>
       </ErrorBoundary>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Próximas parcelas */}
-        <ErrorBoundary fallback={<SectionErrorFallback sectionName="próximas parcelas" />}>
-          <Card className="lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Próximas Parcelas
-              </CardTitle>
-              <Link to="/debts?tab=installments">
-                <Button variant="outline" size="sm">
-                  Ver Todas
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {upcomingInstallments.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground">
-                  <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>Nenhuma parcela próxima do vencimento</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {upcomingInstallments.map((installment) => {
-                    const debt = debts.find(d => d.id === installment.debt_id);
-                    const daysUntilDue = Math.ceil(
-                      (new Date(installment.due_date).getTime() - new Date().getTime()) / 
-                      (1000 * 3600 * 24)
-                    );
-                    
-                    return (
-                      <div key={installment.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                        <div>
-                          <p className="font-medium">{debt?.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Parcela {installment.installment_number} • 
-                            {daysUntilDue === 0 ? ' Vence hoje' : 
-                             daysUntilDue === 1 ? ' Vence amanhã' : 
-                             ` Vence em ${daysUntilDue} dias`}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold">{formatCurrency(installment.amount)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(installment.due_date).toLocaleDateString('pt-BR')}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Resumo de Dívidas */}
+        <ErrorBoundary fallback={<SectionErrorFallback sectionName="resumo de dívidas" />}>
+          <div className="space-y-4">
+            <h2 className="text-2xl font-semibold">🧱 Dívidas</h2>
+            {hasDebts ? (
+              <DebtsSummaryCard
+                debts={debts}
+                installments={installments}
+                formatCurrency={formatCurrency}
+              />
+            ) : (
+              <EmptyStateCard type="debts" />
+            )}
+          </div>
         </ErrorBoundary>
 
-        {/* Ações rápidas */}
-        <ErrorBoundary fallback={<SectionErrorFallback sectionName="ações rápidas" />}>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                Ações Rápidas
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Link to="/debts?tab=add-debt" className="block">
-                <Button className="w-full justify-start" variant="outline">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Dívida
-                </Button>
-              </Link>
-              <Link to="/finances?tab=add-transaction" className="block">
-                <Button className="w-full justify-start" variant="outline">
-                  <TrendingUp className="h-4 w-4 mr-2" />
-                  Nova Transação
-                </Button>
-              </Link>
-              <Link to="/reports" className="block">
-                <Button className="w-full justify-start" variant="outline">
-                  <Bell className="h-4 w-4 mr-2" />
-                  Ver Relatórios
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+        {/* Gráfico de Fluxo Mensal */}
+        <ErrorBoundary fallback={<SectionErrorFallback sectionName="fluxo mensal" />}>
+          <div className="space-y-4">
+            <h2 className="text-2xl font-semibold">📅 Fluxo Mensal</h2>
+            <MonthlyFlowChart
+              data={monthlyData}
+              formatCurrency={formatCurrency}
+            />
+          </div>
         </ErrorBoundary>
       </div>
-
-      {/* Dívidas recentes */}
-      <ErrorBoundary fallback={<SectionErrorFallback sectionName="suas dívidas" />}>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Suas Dívidas</CardTitle>
-            <Link to="/debts">
-              <Button variant="outline" size="sm">
-                Gerenciar Todas
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <ErrorBoundary fallback={<SectionErrorFallback sectionName="lista de dívidas" />}>
-              <DebtListWithDetails
-                debts={debts.slice(0, 3)}
-                installments={installments}
-                loading={loading}
-                onEditDebt={() => {}}
-                onDeleteDebt={() => {}}
-              />
-            </ErrorBoundary>
-            
-            {debts.length === 0 && !loading && (
-              <div className="text-center py-8">
-                <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">Comece a controlar suas dívidas</h3>
-                <p className="text-muted-foreground mb-4">
-                  Cadastre suas dívidas e tenha controle total das suas finanças.
-                </p>
-                <Link to="/debts?tab=add-debt">
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Cadastrar Primeira Dívida
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </ErrorBoundary>
     </div>
   );
 };
