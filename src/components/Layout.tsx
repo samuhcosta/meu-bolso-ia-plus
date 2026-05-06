@@ -15,14 +15,23 @@ import {
   LogOut,
   Wallet,
   PieChart,
-  Sparkles
+  Sparkles,
+  Menu
 } from 'lucide-react';
 import DebtNotifications from '@/components/debt/DebtNotifications';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { 
+  Sheet, 
+  SheetContent, 
+  SheetHeader, 
+  SheetTitle, 
+  SheetTrigger 
+} from '@/components/ui/sheet';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -132,7 +141,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
         {/* Bottom Navigation - Mobile */}
         <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 h-20 bg-card/80 backdrop-blur-2xl border-t border-border px-6 flex items-center justify-between">
-          {navigation.slice(0, 5).map((item) => {
+          {navigation.slice(0, 4).map((item) => {
             const Icon = item.icon;
             const active = isCurrentPath(item.href);
             return (
@@ -150,6 +159,83 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </Link>
             );
           })}
+
+          <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+            <SheetTrigger asChild>
+              <button className="flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-primary transition-all duration-200">
+                <div className="p-2 rounded-xl">
+                  <Menu className="h-6 w-6" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider">Menu</span>
+              </button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="h-[70vh] bg-sidebar-background border-t-sidebar-border rounded-t-[2rem]">
+              <SheetHeader className="pb-6 border-b border-sidebar-border">
+                <SheetTitle className="text-white flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-primary" />
+                  Menu Principal
+                </SheetTitle>
+              </SheetHeader>
+              
+              <div className="py-6 space-y-6 overflow-y-auto max-h-[calc(70vh-120px)]">
+                <div className="grid grid-cols-2 gap-3">
+                  {navigation.slice(4).map((item) => {
+                    const Icon = item.icon;
+                    const active = isCurrentPath(item.href);
+                    return (
+                      <Link
+                        key={item.name}
+                        to={item.href}
+                        onClick={() => setIsMenuOpen(false)}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${
+                          active
+                            ? 'bg-primary/10 border-primary/20 text-primary'
+                            : 'bg-sidebar-accent/50 border-sidebar-border text-sidebar-foreground/60'
+                        }`}
+                      >
+                        <Icon className="h-6 w-6" />
+                        <span className="text-xs font-bold text-center">{item.name}</span>
+                      </Link>
+                    );
+                  })}
+                  {/* Incluindo Metas manualmente se não estiver no slice(4) */}
+                  {navigation[4]?.name !== 'Metas' && navigation.some(n => n.name === 'Metas') && (
+                    <Link
+                      to="/goals"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-sidebar-accent/50 border border-sidebar-border text-sidebar-foreground/60"
+                    >
+                      <Target className="h-6 w-6" />
+                      <span className="text-xs font-bold">Metas</span>
+                    </Link>
+                  )}
+                </div>
+
+                <div className="pt-6 border-t border-sidebar-border space-y-4">
+                  <div className="flex items-center gap-3 px-2">
+                    <Avatar className="h-12 w-12 border-2 border-primary/20">
+                      <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                        {user.name?.charAt(0).toUpperCase() || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 overflow-hidden">
+                      <p className="text-base font-semibold truncate text-white">{user.name}</p>
+                      <p className="text-sm text-sidebar-foreground/40 truncate">{user.plan}</p>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start gap-3 h-14 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-2xl"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="h-5 w-5" />
+                    Sair da conta
+                  </Button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
         </nav>
       </div>
     </div>
