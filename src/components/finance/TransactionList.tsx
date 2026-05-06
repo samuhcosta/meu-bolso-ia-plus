@@ -1,11 +1,15 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  TrendingUp, 
-  TrendingDown, 
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  TrendingUp,
+  TrendingDown,
   Edit,
   Trash2,
   Calendar,
@@ -26,7 +30,29 @@ const TransactionList: React.FC<TransactionListProps> = ({
   onDelete,
   formatCurrency
 }) => {
+  const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
+
   return (
+    <>
+    <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Excluir transação?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Esta ação não pode ser desfeita. A transação "{pendingDelete?.description}" será permanentemente removida.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => { if (pendingDelete) { onDelete(pendingDelete.id); setPendingDelete(null); } }}
+          >
+            Excluir
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <Card>
       <CardHeader>
         <CardTitle>Lista de Transações</CardTitle>
@@ -105,7 +131,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => onDelete(transaction.id)}
+                      onClick={() => setPendingDelete(transaction)}
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -118,6 +144,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
         )}
       </CardContent>
     </Card>
+    </>
   );
 };
 

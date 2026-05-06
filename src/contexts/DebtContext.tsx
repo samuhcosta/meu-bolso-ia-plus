@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useDebtOperations } from '@/hooks/useDebtOperations';
 import { useInstallmentOperations } from '@/hooks/useInstallmentOperations';
 import { DebtContextType } from '@/types/debt';
@@ -29,10 +30,19 @@ export const DebtProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   useEffect(() => {
-    if (user) {
-      fetchDebts();
-      fetchInstallments();
-    }
+    if (!user) return;
+    fetchDebts();
+    fetchInstallments();
+
+    const channel = supabase
+      .channel(`debts-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'debts', filter: `user_id=eq.${user.id}` },
+        () => { fetchDebts(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_installments' },
+        () => { fetchInstallments(); })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   const value = {

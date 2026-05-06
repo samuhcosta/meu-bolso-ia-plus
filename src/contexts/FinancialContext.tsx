@@ -56,13 +56,51 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      refreshData();
-    } else {
+    if (!user) {
       setTransactions([]);
       setGoals([]);
       setNotifications([]);
+      return;
     }
+
+    refreshData();
+
+    // Realtime subscriptions - dashboard atualiza instantaneamente
+    const channel = supabase
+      .channel(`financial-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setTransactions(prev => prev.some(t => t.id === (payload.new as Transaction).id) ? prev : [payload.new as Transaction, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setTransactions(prev => prev.map(t => t.id === (payload.new as Transaction).id ? payload.new as Transaction : t));
+          } else if (payload.eventType === 'DELETE') {
+            setTransactions(prev => prev.filter(t => t.id !== (payload.old as Transaction).id));
+          }
+        })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'goals', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setGoals(prev => prev.some(g => g.id === (payload.new as Goal).id) ? prev : [payload.new as Goal, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setGoals(prev => prev.map(g => g.id === (payload.new as Goal).id ? payload.new as Goal : g));
+          } else if (payload.eventType === 'DELETE') {
+            setGoals(prev => prev.filter(g => g.id !== (payload.old as Goal).id));
+          }
+        })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setNotifications(prev => prev.some(n => n.id === (payload.new as Notification).id) ? prev : [payload.new as Notification, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setNotifications(prev => prev.map(n => n.id === (payload.new as Notification).id ? payload.new as Notification : n));
+          } else if (payload.eventType === 'DELETE') {
+            setNotifications(prev => prev.filter(n => n.id !== (payload.old as Notification).id));
+          }
+        })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   const refreshData = async () => {
