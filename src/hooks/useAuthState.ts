@@ -1,7 +1,6 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { User } from '@supabase/supabase-js';
 import { UserProfile } from '@/types/auth';
 import { createTimeoutPromise, loadUserProfile } from '@/utils/authHelpers';
 
@@ -10,8 +9,18 @@ export const useAuthState = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [loadingTimeout, setLoadingTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const safetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLoadingRef = useRef(true);
   const maxRetries = 3;
+
+  const finishLoading = () => {
+    isLoadingRef.current = false;
+    setIsLoading(false);
+    if (safetyTimeoutRef.current) {
+      clearTimeout(safetyTimeoutRef.current);
+      safetyTimeoutRef.current = null;
+    }
+  };
 
   const initializeAuth = async (attempt: number = 1) => {
     try {
@@ -42,8 +51,8 @@ export const useAuthState = () => {
         console.log('ℹ️ Auth - Nenhuma sessão ativa encontrada');
         setUser(null);
       }
-      
-      setIsLoading(false);
+
+      finishLoading();
 
     } catch (error: any) {
       console.error(`❌ Auth - Tentativa ${attempt} falhou:`, error.message);
@@ -55,7 +64,7 @@ export const useAuthState = () => {
       } else {
         console.error('💥 Auth - Todas as tentativas falharam');
         setError('Não foi possível carregar os dados do servidor. Tente novamente em alguns minutos.');
-        setIsLoading(false);
+        finishLoading();
         setRetryCount(maxRetries);
       }
     }
@@ -82,11 +91,11 @@ export const useAuthState = () => {
         setUser(null);
         setError(null);
       }
-      setIsLoading(false);
+      finishLoading();
     } catch (error: any) {
       console.error('❌ Auth - Erro na mudança do estado:', error.message);
       setError('Erro ao processar mudança de autenticação');
-      setIsLoading(false);
+      finishLoading();
     }
   };
 
@@ -96,15 +105,14 @@ export const useAuthState = () => {
     console.log('🚀 Auth - Inicializando sistema de autenticação...');
 
     // Timeout de segurança de 15 segundos
-    const timeout = setTimeout(() => {
-      if (mounted && isLoading) {
+    safetyTimeoutRef.current = setTimeout(() => {
+      if (mounted && isLoadingRef.current) {
         console.warn('⏰ Auth - Timeout de 15s atingido, forçando fim do loading');
         setError('Conexão demorou muito para responder. Tente recarregar a página.');
         setIsLoading(false);
+        isLoadingRef.current = false;
       }
     }, 15000);
-
-    setLoadingTimeout(timeout);
 
     // Setup do listener de mudanças de auth
     console.log('📡 Auth - Configurando listener de mudanças...');
@@ -119,8 +127,8 @@ export const useAuthState = () => {
       console.log('🧹 Auth - Limpando recursos...');
       mounted = false;
       subscription.unsubscribe();
-      if (timeout) {
-        clearTimeout(timeout);
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
       }
     };
   }, []);
