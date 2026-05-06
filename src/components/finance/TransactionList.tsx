@@ -30,7 +30,29 @@ const TransactionList: React.FC<TransactionListProps> = ({
   onDelete,
   formatCurrency
 }) => {
+  const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
+
   return (
+    <>
+    <AlertDialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Excluir transação?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Esta ação não pode ser desfeita. A transação "{pendingDelete?.description}" será permanentemente removida.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => { if (pendingDelete) { onDelete(pendingDelete.id); setPendingDelete(null); } }}
+          >
+            Excluir
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <Card>
       <CardHeader>
         <CardTitle>Lista de Transações</CardTitle>
