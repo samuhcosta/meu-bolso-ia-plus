@@ -131,7 +131,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => onDelete(transaction.id)}
+                      onClick={() => setPendingDelete(transaction)}
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -144,6 +144,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
         )}
       </CardContent>
     </Card>
+    </>
   );
 };
 
