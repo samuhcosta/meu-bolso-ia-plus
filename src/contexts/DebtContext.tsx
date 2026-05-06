@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useDebtOperations } from '@/hooks/useDebtOperations';
 import { useInstallmentOperations } from '@/hooks/useInstallmentOperations';
 import { DebtContextType } from '@/types/debt';
