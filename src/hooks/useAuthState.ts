@@ -1,7 +1,6 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { User } from '@supabase/supabase-js';
 import { UserProfile } from '@/types/auth';
 import { createTimeoutPromise, loadUserProfile } from '@/utils/authHelpers';
 
@@ -10,8 +9,18 @@ export const useAuthState = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [loadingTimeout, setLoadingTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const safetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLoadingRef = useRef(true);
   const maxRetries = 3;
+
+  const finishLoading = () => {
+    isLoadingRef.current = false;
+    setIsLoading(false);
+    if (safetyTimeoutRef.current) {
+      clearTimeout(safetyTimeoutRef.current);
+      safetyTimeoutRef.current = null;
+    }
+  };
 
   const initializeAuth = async (attempt: number = 1) => {
     try {
