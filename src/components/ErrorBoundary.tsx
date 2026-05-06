@@ -92,7 +92,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                 Recarregar Página
               </Button>
               
-              {process.env.NODE_ENV === 'development' && this.state.error && (
+              {import.meta.env.DEV && this.state.error && (
                 <div className="text-xs text-muted-foreground bg-muted p-3 rounded">
                   <strong>Erro:</strong> {this.state.error.message}
                 </div>
