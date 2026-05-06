@@ -51,8 +51,8 @@ export const useAuthState = () => {
         console.log('ℹ️ Auth - Nenhuma sessão ativa encontrada');
         setUser(null);
       }
-      
-      setIsLoading(false);
+
+      finishLoading();
 
     } catch (error: any) {
       console.error(`❌ Auth - Tentativa ${attempt} falhou:`, error.message);
@@ -64,7 +64,7 @@ export const useAuthState = () => {
       } else {
         console.error('💥 Auth - Todas as tentativas falharam');
         setError('Não foi possível carregar os dados do servidor. Tente novamente em alguns minutos.');
-        setIsLoading(false);
+        finishLoading();
         setRetryCount(maxRetries);
       }
     }
