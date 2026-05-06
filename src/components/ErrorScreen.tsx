@@ -124,7 +124,7 @@ const ErrorScreen: React.FC<ErrorScreenProps> = ({
             </ul>
           </div>
           
-          {process.env.NODE_ENV === 'development' && (
+          {import.meta.env.DEV && (
             <div className="text-xs text-muted-foreground bg-muted p-3 rounded border-l-4 border-red-500">
               <strong>Debug Info:</strong><br/>
               {error}

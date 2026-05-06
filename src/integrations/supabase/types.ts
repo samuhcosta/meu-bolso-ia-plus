@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
   public: {
     Tables: {
       debt_installments: {
@@ -22,7 +27,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          amount: number
+          amount?: number
           created_at?: string
           debt_id: string
           due_date: string
@@ -53,48 +58,6 @@ export type Database = {
           },
         ]
       }
-      debt_notifications: {
-        Row: {
-          created_at: string
-          debt_id: string
-          id: string
-          installment_id: string
-          notification_type: string
-          sent_at: string | null
-        }
-        Insert: {
-          created_at?: string
-          debt_id: string
-          id?: string
-          installment_id: string
-          notification_type: string
-          sent_at?: string | null
-        }
-        Update: {
-          created_at?: string
-          debt_id?: string
-          id?: string
-          installment_id?: string
-          notification_type?: string
-          sent_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "debt_notifications_debt_id_fkey"
-            columns: ["debt_id"]
-            isOneToOne: false
-            referencedRelation: "debts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "debt_notifications_installment_id_fkey"
-            columns: ["installment_id"]
-            isOneToOne: false
-            referencedRelation: "debt_installments"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       debts: {
         Row: {
           category: string
@@ -113,18 +76,18 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          category: string
+          category?: string
           created_at?: string
-          first_installment_date: string
+          first_installment_date?: string
           id?: string
-          installment_amount: number
-          monthly_due_day: number
+          installment_amount?: number
+          monthly_due_day?: number
           name: string
           notes?: string | null
           notifications_enabled?: boolean
           paid_installments?: number
-          total_amount: number
-          total_installments: number
+          total_amount?: number
+          total_installments?: number
           updated_at?: string
           user_id: string
         }
@@ -150,7 +113,7 @@ export type Database = {
         Row: {
           created_at: string
           current_amount: number
-          deadline: string
+          deadline: string | null
           id: string
           target_amount: number
           title: string
@@ -160,9 +123,9 @@ export type Database = {
         Insert: {
           created_at?: string
           current_amount?: number
-          deadline: string
+          deadline?: string | null
           id?: string
-          target_amount: number
+          target_amount?: number
           title: string
           updated_at?: string
           user_id: string
@@ -170,7 +133,7 @@ export type Database = {
         Update: {
           created_at?: string
           current_amount?: number
-          deadline?: string
+          deadline?: string | null
           id?: string
           target_amount?: number
           title?: string
@@ -187,15 +150,17 @@ export type Database = {
           read: boolean
           title: string
           type: string
+          updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
-          message: string
+          message?: string
           read?: boolean
           title: string
-          type: string
+          type?: string
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -205,6 +170,7 @@ export type Database = {
           read?: boolean
           title?: string
           type?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -212,9 +178,9 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
-          email: string | null
+          email: string
           id: string
-          name: string | null
+          name: string
           reset_token: string | null
           reset_token_expires_at: string | null
           updated_at: string
@@ -222,9 +188,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          email?: string | null
+          email?: string
           id: string
-          name?: string | null
+          name?: string
           reset_token?: string | null
           reset_token_expires_at?: string | null
           updated_at?: string
@@ -232,9 +198,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          email?: string | null
+          email?: string
           id?: string
-          name?: string | null
+          name?: string
           reset_token?: string | null
           reset_token_expires_at?: string | null
           updated_at?: string
@@ -255,11 +221,11 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          amount: number
+          amount?: number
           category: string
           created_at?: string
-          date: string
-          description: string
+          date?: string
+          description?: string
           id?: string
           type: string
           updated_at?: string
@@ -283,20 +249,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      cleanup_expired_reset_tokens: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      generate_debt_installments: {
-        Args: {
-          p_debt_id: string
-          p_total_installments: number
-          p_first_installment_date: string
-          p_monthly_due_day: number
-          p_installment_amount: number
-        }
-        Returns: undefined
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
@@ -307,21 +260,25 @@ export type Database = {
   }
 }
 
-type DefaultSchema = Database[Extract<keyof Database, "public">]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
@@ -339,14 +296,16 @@ export type Tables<
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
@@ -362,14 +321,16 @@ export type TablesInsert<
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
@@ -385,14 +346,16 @@ export type TablesUpdate<
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
@@ -400,14 +363,16 @@ export type Enums<
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
