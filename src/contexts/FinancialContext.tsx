@@ -9,6 +9,8 @@ import type { Database } from '@/integrations/supabase/types';
 export type Transaction = Database['public']['Tables']['transactions']['Row'];
 export type Goal = Database['public']['Tables']['goals']['Row'];
 export type Notification = Database['public']['Tables']['notifications']['Row'];
+export type Debt = Database['public']['Tables']['debts']['Row'];
+export type DebtInstallment = Database['public']['Tables']['debt_installments']['Row'];
 
 // Input types for inserts
 export type TransactionInsert = Database['public']['Tables']['transactions']['Insert'];
@@ -18,6 +20,8 @@ interface FinancialContextType {
   transactions: Transaction[];
   goals: Goal[];
   notifications: Notification[];
+  debts: Debt[];
+  installments: DebtInstallment[];
   addTransaction: (transaction: Omit<TransactionInsert, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
@@ -25,7 +29,16 @@ interface FinancialContextType {
   updateGoal: (id: string, goal: Partial<Goal>) => Promise<void>;
   deleteGoal: (id: string) => Promise<void>;
   markNotificationAsRead: (id: string) => Promise<void>;
-  getBalance: () => { income: number; expenses: number; balance: number };
+  getBalance: () => { 
+    income: number; 
+    expenses: number; 
+    balance: number;
+    reservedGoals: number;
+    availableBalance: number;
+    totalDebts: number;
+    paidDebts: number;
+    committedValues: number;
+  };
   getTransactionsByPeriod: (year: number, month?: number) => Transaction[];
   getCategoryExpenses: () => { [key: string]: number };
   isLoading: boolean;
@@ -53,6 +66,8 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [debts, setDebts] = useState<Debt[]>([]);
+  const [installments, setInstallments] = useState<DebtInstallment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -60,6 +75,8 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setTransactions([]);
       setGoals([]);
       setNotifications([]);
+      setDebts([]);
+      setInstallments([]);
       return;
     }
 
@@ -98,6 +115,10 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             setNotifications(prev => prev.filter(n => n.id !== (payload.old as Notification).id));
           }
         })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'debts', filter: `user_id=eq.${user.id}` },
+        () => { refreshData(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'debt_installments' },
+        () => { refreshData(); })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -145,6 +166,31 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         console.error('Error loading notifications:', notificationsError);
       } else {
         setNotifications(notificationsData || []);
+      }
+
+      // Load debts
+      const { data: debtsData, error: debtsError } = await supabase
+        .from('debts')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (debtsError) {
+        console.error('Error loading debts:', debtsError);
+      } else {
+        setDebts(debtsData || []);
+      }
+
+      // Load installments
+      const { data: installmentsData, error: installmentsError } = await supabase
+        .from('debt_installments')
+        .select('*, debts!inner(user_id)')
+        .eq('debts.user_id', user.id);
+
+      if (installmentsError) {
+        console.error('Error loading installments:', installmentsError);
+      } else {
+        setInstallments(installmentsData || []);
       }
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -343,18 +389,60 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const getBalance = () => {
-    const income = transactions
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    // Saldo Total (Todos os tempos)
+    const totalIncome = transactions
       .filter(t => t.type === 'income')
       .reduce((sum, t) => sum + Number(t.amount), 0);
     
-    const expenses = transactions
+    const totalExpenses = transactions
       .filter(t => t.type === 'expense')
       .reduce((sum, t) => sum + Number(t.amount), 0);
     
+    const balance = totalIncome - totalExpenses;
+
+    // Entradas e Saídas do Mês Atual
+    const monthlyTransactions = transactions.filter(t => {
+      const d = new Date(t.date);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    const income = monthlyTransactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+    
+    const expenses = monthlyTransactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+
+    // Metas: Dinheiro reservado
+    const reservedGoals = goals.reduce((sum, g) => sum + Number(g.current_amount || 0), 0);
+
+    // Dívidas: Valores pagos e comprometidos
+    const totalDebts = debts.reduce((sum, d) => sum + Number(d.total_amount), 0);
+    const paidDebts = installments
+      .filter(i => i.is_paid)
+      .reduce((sum, i) => sum + Number(i.amount), 0);
+    
+    const committedValues = installments
+      .filter(i => !i.is_paid)
+      .reduce((sum, i) => sum + Number(i.amount), 0);
+
+    // Saldo disponível = Saldo total - valores reservados em metas - valores comprometidos
+    const availableBalance = balance - reservedGoals - committedValues;
+
     return {
       income,
       expenses,
-      balance: income - expenses
+      balance,
+      reservedGoals,
+      availableBalance,
+      totalDebts,
+      paidDebts,
+      committedValues
     };
   };
 
@@ -383,6 +471,8 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     transactions,
     goals,
     notifications,
+    debts,
+    installments,
     addTransaction,
     updateTransaction,
     deleteTransaction,

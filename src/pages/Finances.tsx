@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFinancial, Transaction } from '@/contexts/FinancialContext';
 import { useToast } from '@/hooks/use-toast';
+import { useSearchParams } from 'react-router-dom';
 import TransactionForm from '@/components/finance/TransactionForm';
 import FinancialSummary from '@/components/finance/FinancialSummary';
 import TransactionFilters from '@/components/finance/TransactionFilters';
@@ -10,10 +11,13 @@ import TransactionList from '@/components/finance/TransactionList';
 
 const Finances = () => {
   const { transactions, addTransaction, updateTransaction, deleteTransaction } = useFinancial();
+  const [searchParams] = useSearchParams();
+  const typeParam = searchParams.get('type');
+  const [activeTab, setActiveTab] = useState('transactions');
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
-    type: 'expense' as 'income' | 'expense' | 'transfer',
+    type: (typeParam === 'income' ? 'income' : 'expense') as 'income' | 'expense' | 'transfer',
     amount: '',
     category: '',
     description: '',
@@ -24,10 +28,26 @@ const Finances = () => {
   const [filters, setFilters] = useState({
     search: '',
     category: 'all',
-    type: 'all',
-    month: 'all',
+    type: typeParam || 'all',
+    month: typeParam ? new Date().getMonth().toString() : 'all',
     year: new Date().getFullYear().toString()
   });
+
+  // Sincronizar filtros com parâmetros da URL quando mudarem
+  useEffect(() => {
+    const type = searchParams.get('type');
+    if (type) {
+      setFilters(prev => ({
+        ...prev,
+        type: type,
+        month: new Date().getMonth().toString() // Forçar mês atual ao usar links laterais
+      }));
+      setFormData(prev => ({
+        ...prev,
+        type: (type === 'income' ? 'income' : 'expense') as 'income' | 'expense' | 'transfer'
+      }));
+    }
+  }, [searchParams]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -71,6 +91,7 @@ const Finances = () => {
       description: '',
       date: new Date().toISOString().split('T')[0]
     });
+    setActiveTab('transactions');
   };
 
   const handleEdit = (transaction: Transaction) => {
@@ -82,6 +103,7 @@ const Finances = () => {
       date: transaction.date
     });
     setEditingId(transaction.id);
+    setActiveTab('add-transaction');
   };
 
   const handleDelete = (id: string) => {
@@ -97,6 +119,7 @@ const Finances = () => {
       description: '',
       date: new Date().toISOString().split('T')[0]
     });
+    setActiveTab('transactions');
   };
 
   const formatCurrency = (value: number) => {
@@ -108,8 +131,8 @@ const Finances = () => {
 
   // Filter transactions
   const filteredTransactions = transactions.filter(transaction => {
-    const matchesSearch = transaction.description.toLowerCase().includes(filters.search.toLowerCase()) ||
-                         transaction.category.toLowerCase().includes(filters.search.toLowerCase());
+    const matchesSearch = (transaction.description || '').toLowerCase().includes(filters.search.toLowerCase()) ||
+                         (transaction.category || '').toLowerCase().includes(filters.search.toLowerCase());
     const matchesCategory = filters.category === 'all' || transaction.category === filters.category;
     const matchesType = filters.type === 'all' || transaction.type === filters.type;
     
@@ -140,7 +163,7 @@ const Finances = () => {
         </p>
       </div>
 
-      <Tabs defaultValue="transactions" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="transactions">Minhas Transações</TabsTrigger>
           <TabsTrigger value="add-transaction">Nova Transação</TabsTrigger>

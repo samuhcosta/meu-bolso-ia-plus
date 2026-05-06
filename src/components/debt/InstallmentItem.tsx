@@ -36,10 +36,10 @@ const InstallmentItem: React.FC<InstallmentItemProps> = ({
     <div
       className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${
         installment.is_paid 
-          ? 'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800' 
+          ? 'bg-emerald-500/10 border-emerald-500/20' 
           : isOverdue(installment.due_date, installment.is_paid)
-          ? 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
-          : 'bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700'
+          ? 'bg-rose-500/10 border-rose-500/20'
+          : 'bg-white/5 border-white/10'
       }`}
     >
       <div className="flex items-center gap-4">

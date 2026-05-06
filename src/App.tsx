@@ -25,7 +25,6 @@ import Reports from "./pages/Reports";
 import Goals from "./pages/Goals";
 import AIAssistant from "./pages/AIAssistant";
 import Import from "./pages/Import";
-import Family from "./pages/Family";
 import Settings from "./pages/Settings";
 import Notifications from "./pages/Notifications";
 import Plans from "./pages/Plans";
@@ -216,11 +215,6 @@ const AppContent = () => {
                               <ErrorBoundary>
                                 <ProtectedRoute><Import />
                               </ProtectedRoute>
-                              </ErrorBoundary>
-                            } />
-                            <Route path="/family" element={
-                              <ErrorBoundary>
-                                <ProtectedRoute><Family /></ProtectedRoute>
                               </ErrorBoundary>
                             } />
                             <Route path="/settings" element={

@@ -47,7 +47,7 @@ const DebtProgressSummary: React.FC<DebtProgressSummaryProps> = ({
           <div>
             <p className="text-sm text-muted-foreground">Progresso</p>
             <div className="flex items-center gap-2">
-              <div className="flex-1 bg-gray-200 rounded-full h-2">
+              <div className="flex-1 bg-gray-200 dark:bg-slate-800 rounded-full h-2">
                 <div 
                   className="bg-green-500 h-2 rounded-full transition-all duration-300" 
                   style={{ width: `${progress}%` }}

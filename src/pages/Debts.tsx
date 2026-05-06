@@ -108,7 +108,7 @@ const Debts = () => {
                 {debts.map(debt => (
                   <div 
                     key={debt.id}
-                    className="p-4 border rounded-lg cursor-pointer hover:bg-muted transition-colors"
+                    className="p-4 border rounded-lg cursor-pointer hover:bg-muted/50 dark:bg-card/40 dark:border-border/50 transition-colors"
                     onClick={() => setSelectedDebt(debt)}
                   >
                     <h4 className="font-medium">{debt.name}</h4>

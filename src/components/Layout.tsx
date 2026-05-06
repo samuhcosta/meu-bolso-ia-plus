@@ -1,177 +1,157 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
   LayoutDashboard, 
-  DollarSign, 
+  ArrowUpCircle, 
+  ArrowDownCircle, 
   CreditCard, 
   Target, 
-  Users, 
   FileText, 
   Settings, 
   LogOut,
-  Menu,
-  X
+  Wallet,
+  PieChart,
+  Sparkles
 } from 'lucide-react';
-import { useState } from 'react';
 import DebtNotifications from '@/components/debt/DebtNotifications';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Finanças', href: '/finances', icon: DollarSign },
+    { name: 'Entradas', href: '/finances?type=income', icon: ArrowUpCircle },
+    { name: 'Saídas', href: '/finances?type=expense', icon: ArrowDownCircle },
     { name: 'Dívidas', href: '/debts', icon: CreditCard },
     { name: 'Metas', href: '/goals', icon: Target },
-    { name: 'Família', href: '/family', icon: Users },
     { name: 'Relatórios', href: '/reports', icon: FileText },
+    { name: 'IA Assistente', href: '/ai-assistant', icon: Sparkles },
+    { name: 'Configurações', href: '/settings', icon: Settings },
   ];
 
   const handleLogout = async () => {
     try {
-      console.log('👋 Layout - Iniciando logout...');
       await logout();
-      console.log('✅ Layout - Logout realizado com sucesso');
     } catch (error: any) {
-      console.error('❌ Layout - Erro no logout:', error.message);
+      console.error('Logout error:', error.message);
     }
   };
 
   const isCurrentPath = (path: string) => {
-    return location.pathname === path;
+    return location.pathname === path || (path.includes('?') && location.pathname + location.search === path);
   };
 
-  // Se não há usuário, não renderizar o layout (deixar as páginas públicas renderizarem sozinhas)
-  if (!user) {
-    console.log('🚫 Layout - Sem usuário, renderizando conteúdo sem layout');
-    return <>{children}</>;
-  }
-
-  console.log('🎨 Layout - Renderizando layout para usuário:', user.name);
+  if (!user) return <>{children}</>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900">
-      {/* Header */}
-      <ErrorBoundary>
-        <header className="sticky top-0 z-40 w-full border-b bg-white/80 backdrop-blur-md dark:bg-gray-900/80 dark:border-gray-800">
-          <div className="container mx-auto px-4">
-            <div className="flex h-16 items-center justify-between">
-              {/* Logo e título */}
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="lg:hidden"
-                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                >
-                  {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-                </Button>
-                <Link to="/dashboard" className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-purple-600">
-                    <DollarSign className="h-5 w-5 text-white" />
-                  </div>
-                  <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    Meu Bolso Pro
-                  </span>
-                </Link>
-              </div>
+    <div className="flex min-h-screen bg-background text-foreground">
+      {/* Sidebar - Desktop */}
+      <aside className="hidden lg:flex w-64 flex-col fixed inset-y-0 left-0 bg-sidebar-background border-r border-sidebar-border z-50">
+        <div className="p-6 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+            <Wallet className="h-6 w-6" />
+          </div>
+          <span className="text-xl font-bold tracking-tight text-white">
+            Meu Bolso <span className="text-primary">Pro</span>
+          </span>
+        </div>
 
-              {/* Navigation - Desktop */}
-              <nav className="hidden lg:flex items-center space-x-1">
-                {navigation.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        isCurrentPath(item.href)
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800'
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {item.name}
-                    </Link>
-                  );
-                })}
-              </nav>
+        <nav className="flex-1 px-4 space-y-1 mt-4">
+          {navigation.map((item) => {
+            const Icon = item.icon;
+            const active = isCurrentPath(item.href);
+            return (
+              <Link
+                key={item.name}
+                to={item.href}
+                className={`flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group ${
+                  active
+                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                    : 'text-sidebar-foreground/60 hover:text-white hover:bg-sidebar-accent'
+                }`}
+              >
+                <Icon className={`h-5 w-5 ${active ? '' : 'group-hover:text-primary'}`} />
+                {item.name}
+              </Link>
+            );
+          })}
+        </nav>
 
-              {/* User menu */}
-              <div className="flex items-center gap-3">
-                <ErrorBoundary>
-                  <DebtNotifications />
-                </ErrorBoundary>
-                
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-gradient-to-br from-blue-600 to-purple-600 text-white">
-                      {user.name?.charAt(0).toUpperCase() || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="hidden md:block">
-                    <p className="text-sm font-medium">{user.name}</p>
-                    <p className="text-xs text-muted-foreground">{user.plan}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <Link to="/settings">
-                    <Button variant="ghost" size="sm">
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                  <Button variant="ghost" size="sm" onClick={handleLogout}>
-                    <LogOut className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+        <div className="p-4 mt-auto border-t border-sidebar-border space-y-4">
+          <div className="flex items-center gap-3 px-2">
+            <Avatar className="h-10 w-10 border-2 border-primary/20">
+              <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                {user.name?.charAt(0).toUpperCase() || 'U'}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 overflow-hidden">
+              <p className="text-sm font-semibold truncate text-white">{user.name}</p>
+              <p className="text-xs text-sidebar-foreground/40 truncate">{user.plan}</p>
             </div>
           </div>
+          
+          <div className="flex gap-2">
+            <DebtNotifications />
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="flex-1 justify-start gap-2 text-sidebar-foreground/60 hover:text-red-400 hover:bg-red-400/10"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4" />
+              Sair
+            </Button>
+          </div>
+        </div>
+      </aside>
 
-          {/* Mobile Navigation */}
-          {isMobileMenuOpen && (
-            <div className="lg:hidden border-t bg-white dark:bg-gray-900 dark:border-gray-800">
-              <nav className="container mx-auto px-4 py-4">
-                <div className="grid gap-2">
-                  {navigation.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <Link
-                        key={item.name}
-                        to={item.href}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                          isCurrentPath(item.href)
-                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800'
-                        }`}
-                      >
-                        <Icon className="h-5 w-5" />
-                        {item.name}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </nav>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col lg:pl-64 pb-20 lg:pb-0">
+        {/* Mobile Header */}
+        <header className="lg:hidden sticky top-0 z-40 w-full h-16 flex items-center justify-between px-6 bg-background/80 backdrop-blur-xl border-b border-border">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+              <Wallet className="h-5 w-5" />
             </div>
-          )}
+            <span className="font-bold text-lg tracking-tight">Meu Bolso Pro</span>
+          </div>
+          <DebtNotifications />
         </header>
-      </ErrorBoundary>
 
-      {/* Main content */}
-      <main className="container mx-auto px-4 py-8">
-        <ErrorBoundary>
-          {children}
-        </ErrorBoundary>
-      </main>
+        <main className="flex-1 container mx-auto px-4 lg:px-8 py-8">
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
+        </main>
+
+        {/* Bottom Navigation - Mobile */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 h-20 bg-card/80 backdrop-blur-2xl border-t border-border px-6 flex items-center justify-between">
+          {navigation.slice(0, 5).map((item) => {
+            const Icon = item.icon;
+            const active = isCurrentPath(item.href);
+            return (
+              <Link
+                key={item.name}
+                to={item.href}
+                className={`flex flex-col items-center justify-center gap-1 transition-all duration-200 ${
+                  active ? 'text-primary scale-110' : 'text-muted-foreground hover:text-primary'
+                }`}
+              >
+                <div className={`p-2 rounded-xl ${active ? 'bg-primary/10' : ''}`}>
+                  <Icon className="h-6 w-6" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider">{item.name}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
     </div>
   );
 };
