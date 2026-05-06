@@ -163,8 +163,8 @@ const Dashboard = () => {
             <CreditCard size={40} />
           </div>
           <CardContent className="p-6">
-            <p className="text-sm font-medium text-muted-foreground mb-1">Total Dívidas</p>
-            <p className="text-2xl font-bold text-amber-500">{formatCurrency(balances.totalDebts)}</p>
+            <p className="text-sm font-medium text-muted-foreground mb-1">Dívidas Ativas</p>
+            <p className="text-2xl font-bold text-amber-500">{formatCurrency(balances.committedValues)}</p>
           </CardContent>
         </Card>
       </div>

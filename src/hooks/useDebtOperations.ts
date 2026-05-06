@@ -88,24 +88,6 @@ export const useDebtOperations = () => {
       setDebts(prev => [data, ...prev]);
       await fetchInstallments();
 
-      // Integração com receitas - criar transação automática
-      if (debtData.total_amount > 0) {
-        try {
-          await supabase
-            .from('transactions')
-            .insert({
-              user_id: user.id,
-              type: 'expense',
-              category: 'Dívidas',
-              description: `Dívida registrada: ${debtData.name}`,
-              amount: debtData.total_amount,
-              date: new Date().toISOString().split('T')[0]
-            });
-        } catch (transactionError) {
-          console.warn('Erro ao criar transação automática:', transactionError);
-        }
-      }
-
       toast({
         title: "Dívida cadastrada",
         description: "Dívida cadastrada com sucesso!",
