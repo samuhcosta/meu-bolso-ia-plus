@@ -91,11 +91,11 @@ export const useAuthState = () => {
         setUser(null);
         setError(null);
       }
-      setIsLoading(false);
+      finishLoading();
     } catch (error: any) {
       console.error('❌ Auth - Erro na mudança do estado:', error.message);
       setError('Erro ao processar mudança de autenticação');
-      setIsLoading(false);
+      finishLoading();
     }
   };
 
@@ -105,15 +105,14 @@ export const useAuthState = () => {
     console.log('🚀 Auth - Inicializando sistema de autenticação...');
 
     // Timeout de segurança de 15 segundos
-    const timeout = setTimeout(() => {
-      if (mounted && isLoading) {
+    safetyTimeoutRef.current = setTimeout(() => {
+      if (mounted && isLoadingRef.current) {
         console.warn('⏰ Auth - Timeout de 15s atingido, forçando fim do loading');
         setError('Conexão demorou muito para responder. Tente recarregar a página.');
         setIsLoading(false);
+        isLoadingRef.current = false;
       }
     }, 15000);
-
-    setLoadingTimeout(timeout);
 
     // Setup do listener de mudanças de auth
     console.log('📡 Auth - Configurando listener de mudanças...');
@@ -128,8 +127,8 @@ export const useAuthState = () => {
       console.log('🧹 Auth - Limpando recursos...');
       mounted = false;
       subscription.unsubscribe();
-      if (timeout) {
-        clearTimeout(timeout);
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
       }
     };
   }, []);
