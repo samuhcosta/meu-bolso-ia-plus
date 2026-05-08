@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { FinancialProvider } from "@/contexts/FinancialContext";
 import { DebtProvider } from "@/contexts/DebtContext";
 import Layout from "@/components/Layout";
@@ -29,6 +30,7 @@ import Settings from "./pages/Settings";
 import Notifications from "./pages/Notifications";
 import Plans from "./pages/Plans";
 import Support from "./pages/Support";
+import CheckoutSuccess from "./pages/CheckoutSuccess";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -46,13 +48,6 @@ const queryClient = new QueryClient({
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading, error, retryCount, maxRetries, retryAuth } = useAuth();
   
-  console.log('🔐 ProtectedRoute - Estado:', { 
-    hasUser: !!user, 
-    isLoading, 
-    hasError: !!error,
-    retryCount 
-  });
-  
   if (isLoading) {
     return (
       <LoadingScreen 
@@ -65,7 +60,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (error) {
-    console.error('❌ ProtectedRoute - Erro de autenticação:', error);
     return (
       <ErrorScreen 
         error={error} 
@@ -77,57 +71,33 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   if (!user) {
-    console.log('👤 ProtectedRoute - Usuário não autenticado, redirecionando para login');
     return <Navigate to="/login" replace />;
   }
   
-  console.log('✅ ProtectedRoute - Usuário autenticado:', user.name);
   return <>{children}</>;
 };
 
-const PublicRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading, error, retryCount, maxRetries, retryAuth } = useAuth();
+const PremiumRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, isLoading: authLoading } = useAuth();
+  const { isPremium, isLoading: subLoading, trialExpired } = useSubscription();
   
-  console.log('🌐 PublicRoute - Estado:', { 
-    hasUser: !!user, 
-    isLoading, 
-    hasError: !!error 
-  });
-  
-  if (isLoading) {
-    return (
-      <LoadingScreen 
-        message="Carregando..." 
-        showRetryInfo={retryCount > 0}
-        currentRetry={retryCount}
-        maxRetries={maxRetries}
-      />
-    );
-  }
-
-  if (error) {
-    console.error('❌ PublicRoute - Erro de autenticação:', error);
-    return (
-      <ErrorScreen 
-        error={error} 
-        onRetry={retryAuth}
-        retryCount={retryCount}
-        maxRetries={maxRetries}
-      />
-    );
+  if (authLoading || subLoading) {
+    return <LoadingScreen message="Verificando acesso..." />;
   }
   
-  if (user) {
-    console.log('✅ PublicRoute - Usuário já autenticado, redirecionando para dashboard');
-    return <Navigate to="/dashboard" replace />;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  // If not premium AND trial has expired, redirect to plans
+  if (!isPremium && trialExpired) {
+    return <Navigate to="/plans" replace />;
   }
   
   return <>{children}</>;
 };
 
 const AppContent = () => {
-  console.log('🚀 App - Renderizando aplicação principal');
-  
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -135,113 +105,47 @@ const AppContent = () => {
         <Sonner />
         <ErrorBoundary>
           <AuthProvider>
-            <ErrorBoundary>
-              <FinancialProvider>
-                <ErrorBoundary>
-                  <DebtProvider>
-                    <BrowserRouter>
-                      <ErrorBoundary>
-                        <Layout>
-                          <Routes>
-                            {/* Public Routes */}
-                            <Route path="/" element={
-                              <ErrorBoundary>
-                                <PublicRoute><Index /></PublicRoute>
-                              </ErrorBoundary>
-                            } />
-                            <Route path="/login" element={
-                              <ErrorBoundary>
-                                <PublicRoute><Login /></PublicRoute>
-                              </ErrorBoundary>
-                            } />
-                            <Route path="/register" element={
-                              <ErrorBoundary>
-                                <PublicRoute><Register /></PublicRoute>
-                              </ErrorBoundary>
-                            } />
-                            <Route path="/forgot-password" element={
-                              <ErrorBoundary>
-                                <PublicRoute><ForgotPassword /></PublicRoute>
-                              </ErrorBoundary>
-                            } />
-                            <Route path="/reset-password" element={
-                              <ErrorBoundary>
-                                <PublicRoute><ResetPassword /></PublicRoute>
-                              </ErrorBoundary>
-                            } />
-                            <Route path="/plans" element={
-                              <ErrorBoundary>
-                                <Plans />
-                              </ErrorBoundary>
-                            } />
-                            <Route path="/support" element={
-                              <ErrorBoundary>
-                                <Support />
-                              </ErrorBoundary>
-                            } />
-                            
-                            {/* Protected Routes */}
-                            <Route path="/dashboard" element={
-                              <ErrorBoundary>
-                                <ProtectedRoute><Dashboard /></ProtectedRoute>
-                              </ErrorBoundary>
-                            } />
-                            <Route path="/finances" element={
-                              <ErrorBoundary>
-                                <ProtectedRoute><Finances /></ProtectedRoute>
-                              </ErrorBoundary>
-                            } />
-                            <Route path="/debts" element={
-                              <ErrorBoundary>
-                                <ProtectedRoute><Debts /></ProtectedRoute>
-                              </ErrorBoundary>
-                            } />
-                            <Route path="/reports" element={
-                              <ErrorBoundary>
-                                <ProtectedRoute><Reports /></ProtectedRoute>
-                              </ErrorBoundary>
-                            } />
-                            <Route path="/goals" element={
-                              <ErrorBoundary>
-                                <ProtectedRoute><Goals /></ProtectedRoute>
-                              </ErrorBoundary>
-                            } />
-                            <Route path="/ai-assistant" element={
-                              <ErrorBoundary>
-                                <ProtectedRoute><AIAssistant /></ProtectedRoute>
-                              </ErrorBoundary>
-                            } />
-                            <Route path="/import" element={
-                              <ErrorBoundary>
-                                <ProtectedRoute><Import />
-                              </ProtectedRoute>
-                              </ErrorBoundary>
-                            } />
-                            <Route path="/settings" element={
-                              <ErrorBoundary>
-                                <ProtectedRoute><Settings /></ProtectedRoute>
-                              </ErrorBoundary>
-                            } />
-                            <Route path="/notifications" element={
-                              <ErrorBoundary>
-                                <ProtectedRoute><Notifications /></ProtectedRoute>
-                              </ErrorBoundary>
-                            } />
-                            
-                            {/* Catch all route */}
-                            <Route path="*" element={
-                              <ErrorBoundary>
-                                <NotFound />
-                              </ErrorBoundary>
-                            } />
-                          </Routes>
-                        </Layout>
-                      </ErrorBoundary>
-                    </BrowserRouter>
-                  </DebtProvider>
-                </ErrorBoundary>
-              </FinancialProvider>
-            </ErrorBoundary>
+            <SubscriptionProvider>
+              <ErrorBoundary>
+                <FinancialProvider>
+                  <ErrorBoundary>
+                    <DebtProvider>
+                      <BrowserRouter>
+                        <ErrorBoundary>
+                          <Layout>
+                            <Routes>
+                              {/* Public Routes */}
+                              <Route path="/" element={<Index />} />
+                              <Route path="/login" element={<Login />} />
+                              <Route path="/register" element={<Register />} />
+                              <Route path="/forgot-password" element={<ForgotPassword />} />
+                              <Route path="/reset-password" element={<ResetPassword />} />
+                              <Route path="/plans" element={<Plans />} />
+                              <Route path="/support" element={<Support />} />
+                              <Route path="/checkout-success" element={<CheckoutSuccess />} />
+                              
+                              {/* Protected Routes */}
+                              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                              <Route path="/finances" element={<ProtectedRoute><Finances /></ProtectedRoute>} />
+                              <Route path="/debts" element={<ProtectedRoute><Debts /></ProtectedRoute>} />
+                              <Route path="/reports" element={<PremiumRoute><Reports /></PremiumRoute>} />
+                              <Route path="/goals" element={<ProtectedRoute><Goals /></ProtectedRoute>} />
+                              <Route path="/ai-assistant" element={<PremiumRoute><AIAssistant /></PremiumRoute>} />
+                              <Route path="/import" element={<PremiumRoute><Import /></PremiumRoute>} />
+                              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                              <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+                              
+                              {/* Catch all route */}
+                              <Route path="*" element={<NotFound />} />
+                            </Routes>
+                          </Layout>
+                        </ErrorBoundary>
+                      </BrowserRouter>
+                    </DebtProvider>
+                  </ErrorBoundary>
+                </FinancialProvider>
+              </ErrorBoundary>
+            </SubscriptionProvider>
           </AuthProvider>
         </ErrorBoundary>
       </TooltipProvider>
@@ -250,8 +154,6 @@ const AppContent = () => {
 };
 
 const App = () => {
-  console.log('🎯 App - Inicializando Meu Bolso Pro');
-  
   return (
     <ErrorBoundary>
       <AppContent />

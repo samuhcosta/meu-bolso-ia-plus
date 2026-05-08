@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
@@ -30,6 +31,7 @@ import {
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth();
+  const { isPremium, trialDaysLeft, trialExpired } = useSubscription();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -92,6 +94,27 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           })}
         </nav>
 
+        {!isPremium && (
+          <div className="px-4 mt-4">
+            <div className="bg-gradient-to-br from-primary/20 to-secondary/20 rounded-2xl p-4 border border-primary/20">
+              <div className="flex items-center gap-2 mb-2 text-primary font-bold text-sm">
+                <Sparkles className="h-4 w-4" />
+                <span>Meu Bolso Pro Premium</span>
+              </div>
+              <p className="text-xs text-sidebar-foreground/60 mb-3">
+                {trialExpired 
+                  ? "Seu período de teste expirou. Assine agora para continuar usando!" 
+                  : `Você tem ${trialDaysLeft} dias de teste restantes.`}
+              </p>
+              <Link to="/plans">
+                <Button className="w-full h-9 text-xs font-bold shadow-lg shadow-primary/20">
+                  Upgrade Agora
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
+
         <div className="p-4 mt-auto border-t border-sidebar-border space-y-4">
           <div className="flex items-center gap-3 px-2">
             <Avatar className="h-10 w-10 border-2 border-primary/20">
@@ -130,7 +153,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </div>
             <span className="font-bold text-lg tracking-tight">Meu Bolso Pro</span>
           </div>
-          <DebtNotifications />
+          <div className="flex items-center gap-2">
+            {!isPremium && (
+              <Link to="/plans">
+                <Button size="sm" className="h-8 px-3 text-[10px] font-bold">UPGRADE</Button>
+              </Link>
+            )}
+            <DebtNotifications />
+          </div>
         </header>
 
         <main className="flex-1 container mx-auto px-4 lg:px-8 py-8">
