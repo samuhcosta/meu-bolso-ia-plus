@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -328,16 +329,16 @@ const Settings = () => {
               </h3>
               <p className="text-sm text-muted-foreground">
                 {user?.plan === 'free' 
-                  ? 'Até 30 transações por mês'
-                  : user?.plan === 'pro'
-                  ? 'Recursos completos + IA'
-                  : 'Plano familiar + WhatsApp'
+                  ? 'Teste grátis por 5 dias'
+                  : 'Acesso completo a todas as funcionalidades'
                 }
               </p>
             </div>
-            <Button variant="outline">
-              {user?.plan === 'free' ? 'Fazer Upgrade' : 'Gerenciar Plano'}
-            </Button>
+            <Link to="/plans">
+              <Button variant={user?.plan === 'free' ? 'default' : 'outline'}>
+                {user?.plan === 'free' ? 'Fazer Upgrade' : 'Gerenciar Plano'}
+              </Button>
+            </Link>
           </div>
         </CardContent>
       </Card>

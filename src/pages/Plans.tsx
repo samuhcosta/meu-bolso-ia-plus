@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Star, DollarSign, Loader2 } from 'lucide-react';
+import { CheckCircle, Star, DollarSign, Loader2, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { Switch } from '@/components/ui/switch';
@@ -25,49 +25,55 @@ const Plans = () => {
     }
   };
 
+  const currentPriceId = isAnnual ? PRICE_ID_ANNUAL : PRICE_ID_MONTHLY;
+  const isCurrentPlan = subscription?.stripe_price_id === currentPriceId && subscription?.status === 'active';
+
   const plans = [
     {
       name: 'Gratuito',
       price: 'R$ 0',
-      period: '/mês',
-      description: 'Para começar a organizar suas finanças',
+      period: '',
+      description: 'Teste o sistema por 5 dias com acesso completo',
       features: [
-        'Até 30 lançamentos por mês',
-        'Controle básico de receitas e despesas',
+        '5 dias de acesso completo',
+        'Controle de receitas e despesas',
         'Categorização manual',
-        'Relatórios simples',
-        'Suporte por email'
+        'Dashboard financeiro',
       ],
       limitations: [
-        'Sem assistente IA',
-        'Sem notificações automáticas',
-        'Sem importação de extratos'
+        'Acesso limitado a 5 dias',
+        'Sem assistente IA após teste',
+        'Sem relatórios avançados',
       ],
-      buttonText: 'Começar Grátis',
+      buttonText: 'Começar Teste Grátis',
       priceId: null,
-      popular: false
+      popular: false,
     },
     {
       name: 'Pro',
-      price: isAnnual ? 'R$ 149,00' : 'R$ 14,90',
+      price: isAnnual ? 'R$ 197,00' : 'R$ 19,90',
       period: isAnnual ? '/ano' : '/mês',
-      description: 'Para quem quer controle total das finanças',
+      description: isAnnual 
+        ? 'Economize pagando anualmente — equivale a R$ 16,42/mês' 
+        : 'Acesso completo a todas as funcionalidades',
       features: [
         'Lançamentos ilimitados',
         'Assistente com IA personalizado',
         'Relatórios avançados e gráficos',
         'Metas financeiras inteligentes',
         'Notificações por email',
-        'Categorização automática',
-        'Análise de tendências',
-        'Exportação de relatórios em PDF'
+        'Categorização automática com IA',
+        'Análise de tendências de gastos',
+        'Exportação de relatórios em PDF',
+        'Importação de extratos bancários',
+        'Suporte prioritário',
       ],
       limitations: [],
-      buttonText: subscription?.stripe_price_id === (isAnnual ? PRICE_ID_ANNUAL : PRICE_ID_MONTHLY) ? 'Plano Atual' : 'Assinar Pro',
-      priceId: isAnnual ? PRICE_ID_ANNUAL : PRICE_ID_MONTHLY,
+      buttonText: isCurrentPlan ? 'Plano Atual' : 'Assinar Agora',
+      priceId: currentPriceId,
       popular: true,
-      savings: isAnnual ? 'Economize 17%' : null
-    }
+      savings: isAnnual ? 'Economize R$ 41,80/ano' : null,
+    },
   ];
 
   return (
@@ -81,7 +87,6 @@ const Plans = () => {
             </div>
             <span className="text-xl font-bold text-gradient">Meu Bolso Pro</span>
           </Link>
-          
           <div className="flex items-center space-x-4">
             <Link to="/dashboard">
               <Button variant="ghost" size="sm">Voltar ao App</Button>
@@ -91,77 +96,80 @@ const Plans = () => {
       </header>
 
       <div className="py-12 px-4">
-        <div className="max-w-7xl mx-auto">
-          {/* Hero Section */}
+        <div className="max-w-5xl mx-auto">
+          {/* Hero */}
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              Escolha o plano ideal para
-              <span className="text-gradient block">suas necessidades</span>
+              Desbloqueie o poder do
+              <span className="text-gradient block">Meu Bolso Pro</span>
             </h1>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
-              Transforme sua vida financeira com ferramentas inteligentes e suporte completo.
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
+              Controle total das suas finanças com inteligência artificial, relatórios avançados e muito mais.
             </p>
 
             {/* Toggle Billing */}
-            <div className="flex items-center justify-center space-x-4 mb-8">
-              <Label htmlFor="billing-toggle" className={!isAnnual ? "font-bold" : "text-muted-foreground"}>Mensal</Label>
-              <Switch 
-                id="billing-toggle" 
-                checked={isAnnual} 
-                onCheckedChange={setIsAnnual} 
+            <div className="flex items-center justify-center space-x-4 mb-2">
+              <Label htmlFor="billing-toggle" className={!isAnnual ? "font-bold text-base" : "text-muted-foreground text-base"}>Mensal</Label>
+              <Switch
+                id="billing-toggle"
+                checked={isAnnual}
+                onCheckedChange={setIsAnnual}
               />
-              <Label htmlFor="billing-toggle" className={isAnnual ? "font-bold" : "text-muted-foreground"}>
-                Anual <span className="ml-1 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">Economize 17%</span>
+              <Label htmlFor="billing-toggle" className={isAnnual ? "font-bold text-base" : "text-muted-foreground text-base"}>
+                Anual
               </Label>
             </div>
+            {isAnnual && (
+              <p className="text-sm text-primary font-medium">
+                💰 Economize R$ 41,80 por ano pagando anualmente!
+              </p>
+            )}
           </div>
 
           {/* Pricing Cards */}
-          <div className="flex flex-col md:flex-row justify-center items-stretch gap-8 mb-16 max-w-5xl mx-auto">
+          <div className="flex flex-col md:flex-row justify-center items-stretch gap-8 mb-16 max-w-4xl mx-auto">
             {plans.map((plan, index) => (
-              <Card 
-                key={index} 
-                className={`relative transition-all hover:shadow-xl flex-1 flex flex-col ${
-                  plan.popular ? 'border-primary shadow-lg scale-105 z-10' : ''
+              <Card
+                key={index}
+                className={`relative transition-all duration-300 hover:shadow-xl flex-1 flex flex-col ${
+                  plan.popular ? 'border-primary shadow-lg md:scale-105 z-10' : ''
                 }`}
               >
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <div className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-2 rounded-full text-sm font-medium flex items-center">
-                      <Star className="w-4 h-4 mr-1" />
+                    <div className="bg-gradient-to-r from-primary to-secondary text-white px-6 py-2 rounded-full text-sm font-medium flex items-center gap-1">
+                      <Star className="w-4 h-4" />
                       Mais Popular
                     </div>
                   </div>
                 )}
-                
-                <CardHeader className="text-center pb-8">
+
+                <CardHeader className="text-center pb-6">
                   <CardTitle className="text-2xl mb-2">{plan.name}</CardTitle>
-                  <div className="mb-4">
+                  <div className="mb-2">
                     <span className="text-4xl font-bold">{plan.price}</span>
-                    <span className="text-muted-foreground">{plan.period}</span>
+                    {plan.period && <span className="text-muted-foreground text-lg">{plan.period}</span>}
                   </div>
-                  <CardDescription className="text-base h-12">
+                  <CardDescription className="text-sm min-h-[40px]">
                     {plan.description}
                   </CardDescription>
                 </CardHeader>
 
-                <CardContent className="space-y-6 flex-grow">
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-primary">✅ Funcionalidades</h4>
+                <CardContent className="space-y-5 flex-grow">
+                  <div className="space-y-2.5">
                     {plan.features.map((feature, idx) => (
-                      <div key={idx} className="flex items-start">
-                        <CheckCircle className="w-5 h-5 text-primary mr-3 mt-0.5 flex-shrink-0" />
+                      <div key={idx} className="flex items-start gap-2.5">
+                        <CheckCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
                         <span className="text-sm">{feature}</span>
                       </div>
                     ))}
                   </div>
 
                   {plan.limitations.length > 0 && (
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-muted-foreground">❌ Não incluído</h4>
+                    <div className="space-y-2.5 pt-2 border-t border-border">
                       {plan.limitations.map((limitation, idx) => (
-                        <div key={idx} className="flex items-start">
-                          <span className="w-5 h-5 text-muted-foreground mr-3 mt-0.5 flex-shrink-0">✗</span>
+                        <div key={idx} className="flex items-start gap-2.5">
+                          <span className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0 text-center">✗</span>
                           <span className="text-sm text-muted-foreground">{limitation}</span>
                         </div>
                       ))}
@@ -171,23 +179,18 @@ const Plans = () => {
 
                 <div className="p-6 pt-0 mt-auto">
                   {plan.priceId ? (
-                    <Button 
-                      className="w-full text-lg h-12"
+                    <Button
+                      className="w-full text-base h-12"
                       onClick={() => handleSubscribe(plan.priceId!)}
-                      disabled={loadingPriceId === plan.priceId || subscription?.stripe_price_id === plan.priceId}
+                      disabled={loadingPriceId === plan.priceId || isCurrentPlan}
                       variant={plan.popular ? 'default' : 'outline'}
                     >
-                      {loadingPriceId === plan.priceId ? (
-                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                      ) : null}
-                      {plan.buttonText}
+                      {loadingPriceId === plan.priceId && <Loader2 className="w-5 h-5 animate-spin mr-2" />}
+                      {isCurrentPlan ? '✓ Plano Atual' : plan.buttonText}
                     </Button>
                   ) : (
-                    <Link to="/dashboard" className="block">
-                      <Button 
-                        className="w-full text-lg h-12"
-                        variant="outline"
-                      >
+                    <Link to="/register" className="block">
+                      <Button className="w-full text-base h-12" variant="outline">
                         {plan.buttonText}
                       </Button>
                     </Link>
@@ -197,21 +200,13 @@ const Plans = () => {
             ))}
           </div>
 
-          {/* Features Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
-            {[
-              { title: 'Assistente IA', desc: 'Dicas personalizadas para economizar mais.' },
-              { title: 'Relatórios PDF', desc: 'Exporte seus gastos com um clique.' },
-              { title: 'Metas Inteligentes', desc: 'Acompanhe seu progresso em tempo real.' },
-              { title: 'Suporte VIP', desc: 'Atendimento prioritário via WhatsApp.' },
-              { title: 'Segurança Total', desc: 'Dados criptografados com padrão bancário.' },
-              { title: 'Multi-dispositivo', desc: 'Acesse de qualquer lugar, a qualquer hora.' }
-            ].map((f, i) => (
-              <div key={i} className="p-6 rounded-2xl bg-card border border-border">
-                <h3 className="text-lg font-bold mb-2">{f.title}</h3>
-                <p className="text-muted-foreground">{f.desc}</p>
-              </div>
-            ))}
+          {/* Guarantee */}
+          <div className="text-center bg-card border border-border rounded-2xl p-8 max-w-2xl mx-auto">
+            <Zap className="w-10 h-10 text-primary mx-auto mb-3" />
+            <h3 className="text-lg font-bold mb-2">Satisfação garantida</h3>
+            <p className="text-muted-foreground text-sm">
+              Cancele a qualquer momento sem fidelidade. Seu acesso continua até o final do período pago.
+            </p>
           </div>
         </div>
       </div>

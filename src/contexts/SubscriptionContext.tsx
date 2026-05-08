@@ -105,14 +105,22 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+      const { data, error: invokeError } = await supabase.functions.invoke('create-checkout-session', {
         body: { 
           priceId, 
           returnUrl: window.location.origin 
         },
       });
 
-      if (error) throw error;
+      // The function always returns 200, check data.success
+      if (invokeError) {
+        throw new Error(`Erro de conexão: ${invokeError.message}`);
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Erro desconhecido ao iniciar checkout.');
+      }
+
       if (data?.url) {
         window.location.href = data.url;
       }

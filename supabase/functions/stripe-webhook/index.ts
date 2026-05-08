@@ -1,7 +1,7 @@
-
+// @ts-nocheck - Este arquivo roda no Deno (Supabase Edge Functions), não no Node.js
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import Stripe from 'https://esm.sh/stripe@14.25.0?target=deno'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import Stripe from 'https://esm.sh/stripe@14.16.0?target=deno'
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
   apiVersion: '2023-10-16',
@@ -32,9 +32,10 @@ serve(async (req) => {
       undefined,
       cryptoProvider
     )
-  } catch (err) {
-    console.error(`❌ Webhook signature verification failed: ${err.message}`)
-    return new Response(`Webhook Error: ${err.message}`, { status: 400 })
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err)
+    console.error(`❌ Webhook signature verification failed: ${errMsg}`)
+    return new Response(`Webhook Error: ${errMsg}`, { status: 400 })
   }
 
   console.log(`🔔 Received event: ${event.type}`)
@@ -156,8 +157,9 @@ serve(async (req) => {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     })
-  } catch (err) {
-    console.error(`❌ Error processing webhook: ${err.message}`)
-    return new Response(`Error: ${err.message}`, { status: 500 })
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err)
+    console.error(`❌ Error processing webhook: ${errMsg}`)
+    return new Response(`Error: ${errMsg}`, { status: 500 })
   }
 })

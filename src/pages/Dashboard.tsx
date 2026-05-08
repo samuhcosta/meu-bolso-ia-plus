@@ -16,6 +16,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import MonthlyFlowChart from '@/components/dashboard/MonthlyFlowChart';
+import CategoryDonutChart from '@/components/dashboard/CategoryDonutChart';
 import SectionErrorFallback from '@/components/dashboard/SectionErrorFallback';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -175,12 +176,12 @@ const Dashboard = () => {
           <CardHeader className="p-8 pb-0">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-xl">Fluxo de Caixa</CardTitle>
-                <p className="text-sm text-muted-foreground">Comparativo de entradas e saídas</p>
+                <CardTitle className="text-xl">Evolução Financeira</CardTitle>
+                <p className="text-sm text-muted-foreground">Receitas vs Despesas — últimos 6 meses</p>
               </div>
               <div className="flex gap-4">
                 <div className="flex items-center gap-2 text-xs font-medium">
-                  <div className="h-3 w-3 rounded-full bg-primary" /> Receitas
+                  <div className="h-3 w-3 rounded-full bg-green-500" /> Receitas
                 </div>
                 <div className="flex items-center gap-2 text-xs font-medium">
                   <div className="h-3 w-3 rounded-full bg-red-500" /> Despesas
@@ -195,14 +196,14 @@ const Dashboard = () => {
                   data={(() => {
                     const months = [];
                     const now = new Date();
-                    for (let i = 2; i >= 0; i--) {
+                    for (let i = 5; i >= 0; i--) {
                       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
                       const mTransactions = transactions.filter(t => {
                         const td = new Date(t.date);
                         return td.getMonth() === d.getMonth() && td.getFullYear() === d.getFullYear();
                       });
                       months.push({
-                        month: d.toLocaleDateString('pt-BR', { month: 'short' }),
+                        month: d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''),
                         receitas: mTransactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0),
                         despesas: mTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
                       });
@@ -216,55 +217,114 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
+        {/* Category Donut Chart */}
         <Card className="bg-card border-border/50 rounded-[2rem] overflow-hidden">
           <CardHeader className="p-8 pb-0">
-            <CardTitle className="text-xl">Status de Dívidas</CardTitle>
-            <p className="text-sm text-muted-foreground">Progresso de pagamentos</p>
+            <CardTitle className="text-xl">Categorias de Despesas</CardTitle>
+            <p className="text-sm text-muted-foreground">Onde você mais gasta</p>
           </CardHeader>
-          <CardContent className="p-8 space-y-6">
-            <div className="relative h-48 flex items-center justify-center">
-              <div className="absolute inset-0 flex items-center justify-center flex-col">
-                <span className="text-3xl font-bold">{Math.round((balances.paidDebts / (balances.totalDebts || 1)) * 100)}%</span>
-                <span className="text-[10px] uppercase text-muted-foreground font-bold tracking-widest">Pago</span>
+          <CardContent className="p-8">
+            <ErrorBoundary fallback={<SectionErrorFallback sectionName="categorias" />}>
+              <CategoryDonutChart
+                data={(() => {
+                  const now = new Date();
+                  const currentMonth = now.getMonth();
+                  const currentYear = now.getFullYear();
+                  const monthExpenses = transactions.filter(t => {
+                    const td = new Date(t.date);
+                    return t.type === 'expense' && td.getMonth() === currentMonth && td.getFullYear() === currentYear;
+                  });
+                  const categoryMap: Record<string, number> = {};
+                  monthExpenses.forEach(t => {
+                    const cat = t.category || 'Outros';
+                    categoryMap[cat] = (categoryMap[cat] || 0) + Number(t.amount);
+                  });
+                  return Object.entries(categoryMap).map(([name, value]) => ({
+                    name,
+                    value,
+                    color: '',
+                  }));
+                })()}
+                total={balances.expenses}
+                formatCurrency={formatCurrency}
+              />
+            </ErrorBoundary>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Debt Progress Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <Card className="bg-card border-border/50 rounded-[2rem] overflow-hidden">
+          <CardHeader className="p-8 pb-0">
+            <CardTitle className="text-xl">Progresso das Dívidas</CardTitle>
+            <p className="text-sm text-muted-foreground">Quanto já foi pago</p>
+          </CardHeader>
+          <CardContent className="p-8">
+            <div className="flex items-center gap-8">
+              <div className="relative h-40 w-40 flex-shrink-0">
+                <div className="absolute inset-0 flex items-center justify-center flex-col">
+                  <span className="text-3xl font-bold">{Math.round((balances.paidDebts / (balances.totalDebts || 1)) * 100)}%</span>
+                  <span className="text-[10px] uppercase text-muted-foreground font-bold tracking-widest">Pago</span>
+                </div>
+                <svg className="h-40 w-40 -rotate-90">
+                  <circle cx="80" cy="80" r="70" fill="none" stroke="currentColor" strokeWidth="10" className="text-muted/20" />
+                  <circle
+                    cx="80" cy="80" r="70" fill="none" stroke="currentColor" strokeWidth="10"
+                    strokeDasharray={440}
+                    strokeDashoffset={440 - (440 * (balances.paidDebts / (balances.totalDebts || 1)))}
+                    strokeLinecap="round" className="text-primary transition-all duration-1000"
+                  />
+                </svg>
               </div>
-              {/* Simplificando o gráfico de dívidas para um resumo visual */}
-              <svg className="h-40 w-40 -rotate-90">
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="70"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="12"
-                  className="text-muted/20"
-                />
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="70"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="12"
-                  strokeDasharray={440}
-                  strokeDashoffset={440 - (440 * (balances.paidDebts / (balances.totalDebts || 1)))}
-                  strokeLinecap="round"
-                  className="text-primary"
-                />
-              </svg>
+              <div className="flex-1 space-y-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-2"><Clock className="h-4 w-4" /> Restante</span>
+                  <span className="font-bold">{formatCurrency(balances.committedValues)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> Já Pago</span>
+                  <span className="font-bold text-green-500">{formatCurrency(balances.paidDebts)}</span>
+                </div>
+                <Link to="/debts">
+                  <Button className="w-full rounded-2xl mt-2 bg-muted hover:bg-muted/80 text-foreground" variant="ghost">
+                    Gerenciar Dívidas
+                  </Button>
+                </Link>
+              </div>
             </div>
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-2"><Clock className="h-4 w-4" /> Restante</span>
-                <span className="font-bold">{formatCurrency(balances.committedValues)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> Já Pago</span>
-                <span className="font-bold text-green-500">{formatCurrency(balances.paidDebts)}</span>
-              </div>
-            </div>
-            <Link to="/debts">
-              <Button className="w-full rounded-2xl mt-4 bg-muted hover:bg-muted/80 text-foreground" variant="ghost">
-                Gerenciar Dívidas
+          </CardContent>
+        </Card>
+
+        {/* Quick Actions */}
+        <Card className="bg-card border-border/50 rounded-[2rem] overflow-hidden">
+          <CardHeader className="p-8 pb-0">
+            <CardTitle className="text-xl">Ações Rápidas</CardTitle>
+            <p className="text-sm text-muted-foreground">O que você quer fazer agora?</p>
+          </CardHeader>
+          <CardContent className="p-8 grid grid-cols-2 gap-3">
+            <Link to="/finances?type=income">
+              <Button variant="outline" className="w-full h-20 flex-col gap-2 rounded-2xl hover:border-green-500/50 hover:bg-green-500/5">
+                <TrendingUp className="h-5 w-5 text-green-500" />
+                <span className="text-xs">Nova Receita</span>
+              </Button>
+            </Link>
+            <Link to="/finances?type=expense">
+              <Button variant="outline" className="w-full h-20 flex-col gap-2 rounded-2xl hover:border-red-500/50 hover:bg-red-500/5">
+                <TrendingDown className="h-5 w-5 text-red-500" />
+                <span className="text-xs">Nova Despesa</span>
+              </Button>
+            </Link>
+            <Link to="/goals">
+              <Button variant="outline" className="w-full h-20 flex-col gap-2 rounded-2xl hover:border-primary/50 hover:bg-primary/5">
+                <Target className="h-5 w-5 text-primary" />
+                <span className="text-xs">Metas</span>
+              </Button>
+            </Link>
+            <Link to="/reports">
+              <Button variant="outline" className="w-full h-20 flex-col gap-2 rounded-2xl hover:border-amber-500/50 hover:bg-amber-500/5">
+                <ArrowRight className="h-5 w-5 text-amber-500" />
+                <span className="text-xs">Relatórios</span>
               </Button>
             </Link>
           </CardContent>

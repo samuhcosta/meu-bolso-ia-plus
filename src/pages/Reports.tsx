@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useFinancial } from '@/contexts/FinancialContext';
 import { getFilteredTransactions, calculateReportMetrics, getMonthlyData } from '@/utils/reportUtils';
+import { generatePDF } from '@/utils/pdfGenerator';
 import ReportSummaryCards from '@/components/reports/ReportSummaryCards';
 import CategoryExpensesCard from '@/components/reports/CategoryExpensesCard';
 import MonthlyTrendsCard from '@/components/reports/MonthlyTrendsCard';
@@ -18,19 +19,15 @@ const Reports = () => {
   const monthlyData = getMonthlyData(transactions, selectedYear);
 
   const exportToPDF = () => {
-    // Simulate PDF export
-    const reportData = {
+    generatePDF({
       period: selectedPeriod,
       year: selectedYear,
       income,
       expenses,
       balance,
-      transactions: filteredTransactions.length,
-      topCategories
-    };
-    
-    console.log('Exporting report:', reportData);
-    alert('Relatório exportado com sucesso! (Funcionalidade simulada)');
+      topCategories,
+      transactions: filteredTransactions,
+    });
   };
 
   return (
