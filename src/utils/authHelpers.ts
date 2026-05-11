@@ -3,13 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { UserProfile } from '@/types/auth';
 
-// Timeout utility com AbortController melhorado
+// Timeout utility
 export const createTimeoutPromise = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
-  const controller = new AbortController();
-  
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => {
-      controller.abort();
       reject(new Error(`Timeout: Operação excedeu ${timeoutMs/1000}s`));
     }, timeoutMs);
   });
@@ -30,7 +27,7 @@ export const loadUserProfile = async (authUser: User): Promise<UserProfile> => {
         .single()
     );
 
-    const { data: profile, error } = await createTimeoutPromise(profileQueryPromise, 3000);
+    const { data: profile, error } = await createTimeoutPromise(profileQueryPromise, 10000);
 
     if (error && error.code !== 'PGRST116') {
       console.warn('⚠️ Profile - Erro ao carregar perfil (usando dados básicos):', error.message);

@@ -28,10 +28,10 @@ export const useAuthState = () => {
       setIsLoading(true);
       setError(null);
 
-      // Timeout reduzido para 5 segundos
+      // Timeout aumentado para 15s (redes móveis são mais lentas)
       console.log('🔍 Auth - Verificando sessão existente...');
       const sessionPromise = supabase.auth.getSession();
-      const { data: { session }, error: sessionError } = await createTimeoutPromise(sessionPromise, 5000);
+      const { data: { session }, error: sessionError } = await createTimeoutPromise(sessionPromise, 15000);
       
       if (sessionError) {
         console.error('❌ Auth - Erro na verificação de sessão:', sessionError);
@@ -104,15 +104,15 @@ export const useAuthState = () => {
 
     console.log('🚀 Auth - Inicializando sistema de autenticação...');
 
-    // Timeout de segurança de 15 segundos
+    // Timeout de segurança de 30 segundos (redes móveis)
     safetyTimeoutRef.current = setTimeout(() => {
       if (mounted && isLoadingRef.current) {
-        console.warn('⏰ Auth - Timeout de 15s atingido, forçando fim do loading');
+        console.warn('⏰ Auth - Timeout de 30s atingido, forçando fim do loading');
         setError('Conexão demorou muito para responder. Tente recarregar a página.');
         setIsLoading(false);
         isLoadingRef.current = false;
       }
-    }, 15000);
+    }, 30000);
 
     // Setup do listener de mudanças de auth
     console.log('📡 Auth - Configurando listener de mudanças...');
