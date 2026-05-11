@@ -31,8 +31,14 @@ import {
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth();
-  const { isPremium, trialDaysLeft, trialExpired } = useSubscription();
+  const { subscription, isPremium, trialDaysLeft, trialExpired } = useSubscription();
   const location = useLocation();
+
+  const planLabel = isPremium
+    ? subscription?.plan_name || 'Pro'
+    : trialExpired
+    ? 'Expirado'
+    : 'Teste';
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const navigation = [
@@ -124,7 +130,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </Avatar>
             <div className="flex-1 overflow-hidden">
               <p className="text-sm font-semibold truncate text-white">{user.name}</p>
-              <p className="text-xs text-sidebar-foreground/40 truncate">{user.plan}</p>
+              <p className="text-xs text-sidebar-foreground/40 truncate">{planLabel}</p>
             </div>
           </div>
           
@@ -250,7 +256,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     </Avatar>
                     <div className="flex-1 overflow-hidden">
                       <p className="text-base font-semibold truncate text-white">{user.name}</p>
-                      <p className="text-sm text-sidebar-foreground/40 truncate">{user.plan}</p>
+                      <p className="text-sm text-sidebar-foreground/40 truncate">{planLabel}</p>
                     </div>
                   </div>
                   

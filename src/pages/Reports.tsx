@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useFinancial } from '@/contexts/FinancialContext';
 import { getFilteredTransactions, calculateReportMetrics, getMonthlyData } from '@/utils/reportUtils';
 import { generatePDF } from '@/utils/pdfGenerator';
+import { generateExcel } from '@/utils/excelGenerator';
 import ReportSummaryCards from '@/components/reports/ReportSummaryCards';
 import CategoryExpensesCard from '@/components/reports/CategoryExpensesCard';
 import MonthlyTrendsCard from '@/components/reports/MonthlyTrendsCard';
@@ -30,6 +31,19 @@ const Reports = () => {
     });
   };
 
+  const exportToExcel = async () => {
+    await generateExcel({
+      period: selectedPeriod,
+      year: selectedYear,
+      income,
+      expenses,
+      balance,
+      topCategories,
+      transactions: filteredTransactions,
+      monthlyData,
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -46,6 +60,7 @@ const Reports = () => {
           onPeriodChange={setSelectedPeriod}
           onYearChange={setSelectedYear}
           onExportPDF={exportToPDF}
+          onExportExcel={exportToExcel}
         />
       </div>
 

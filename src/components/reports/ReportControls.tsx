@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download } from 'lucide-react';
+import { Download, FileSpreadsheet } from 'lucide-react';
 
 interface ReportControlsProps {
   selectedPeriod: string;
@@ -10,6 +10,7 @@ interface ReportControlsProps {
   onPeriodChange: (value: string) => void;
   onYearChange: (value: string) => void;
   onExportPDF: () => void;
+  onExportExcel: () => void;
 }
 
 const ReportControls: React.FC<ReportControlsProps> = ({
@@ -17,7 +18,8 @@ const ReportControls: React.FC<ReportControlsProps> = ({
   selectedYear,
   onPeriodChange,
   onYearChange,
-  onExportPDF
+  onExportPDF,
+  onExportExcel
 }) => {
   const periods = [
     { value: 'current-month', label: 'Mês Atual' },
@@ -57,7 +59,11 @@ const ReportControls: React.FC<ReportControlsProps> = ({
       
       <Button onClick={onExportPDF} variant="outline">
         <Download className="w-4 h-4 mr-2" />
-        Exportar PDF
+        PDF
+      </Button>
+      <Button onClick={onExportExcel} variant="outline">
+        <FileSpreadsheet className="w-4 h-4 mr-2" />
+        Excel
       </Button>
     </div>
   );

@@ -21,6 +21,7 @@ interface SubscriptionContextType {
   trialDaysLeft: number;
   trialExpired: boolean;
   checkout: (priceId: string) => Promise<void>;
+  cancelSubscription: (reason: string) => Promise<{ success: boolean; error?: string; message?: string }>;
   refreshSubscription: () => Promise<void>;
 }
 
@@ -39,6 +40,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userCreatedAt, setUserCreatedAt] = useState<string | null>(null);
+  const [trialDaysConfig, setTrialDaysConfig] = useState<number>(5);
 
   const fetchSubscription = async () => {
     if (!user) {
@@ -58,15 +60,18 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (subError && subError.code !== 'PGRST116') throw subError;
       setSubscription(subData);
 
-      // Fetch user profile to get created_at for trial logic
+      // Fetch user profile to get created_at and trial_days
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('created_at')
+        .select('created_at, trial_days')
         .eq('id', user.id)
         .single();
       
       if (profileData) {
         setUserCreatedAt(profileData.created_at);
+        if (profileData.trial_days != null) {
+          setTrialDaysConfig(profileData.trial_days);
+        }
       }
 
     } catch (error) {
@@ -133,10 +138,35 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
+  const cancelSubscription = async (reason: string): Promise<{ success: boolean; error?: string; message?: string }> => {
+    if (!user) {
+      return { success: false, error: "Você precisa estar logado." };
+    }
+
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke('cancel-subscription', {
+        body: { reason },
+      });
+
+      if (invokeError) {
+        return { success: false, error: `Erro de conexão: ${invokeError.message}` };
+      }
+
+      if (!data?.success) {
+        return { success: false, error: data?.error || 'Erro ao cancelar assinatura.' };
+      }
+
+      await fetchSubscription();
+
+      return { success: true, message: data.message };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Erro inesperado.' };
+    }
+  };
+
   const isPremium = subscription?.status === 'active' || subscription?.status === 'trialing';
   
-  // Trial Logic: 5 days from created_at
-  const trialDaysLimit = 5;
+  // Trial Logic: from created_at + trial_days (configurado no banco)
   let trialDaysLeft = 0;
   let trialExpired = false;
 
@@ -148,11 +178,11 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const currentDate = new Date();
     const diffMs = currentDate.getTime() - createdDate.getTime();
     const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
-    trialDaysLeft = Math.max(0, trialDaysLimit - diffDays);
-    trialExpired = diffDays >= trialDaysLimit;
+    trialDaysLeft = Math.max(0, trialDaysConfig - diffDays);
+    trialExpired = diffDays >= trialDaysConfig;
   } else {
-    // Ainda carregando o perfil - mostra 5 dias otimisticamente
-    trialDaysLeft = trialDaysLimit;
+    // Ainda carregando o perfil - mostra dias configurados otimisticamente
+    trialDaysLeft = trialDaysConfig;
     trialExpired = false;
   }
 
@@ -163,6 +193,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     trialDaysLeft,
     trialExpired,
     checkout,
+    cancelSubscription,
     refreshSubscription: fetchSubscription,
   };
 

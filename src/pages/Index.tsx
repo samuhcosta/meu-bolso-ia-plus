@@ -488,7 +488,7 @@ const Index = () => {
               <h4 className="font-semibold mb-4">Suporte</h4>
               <ul className="space-y-2 text-muted-foreground text-sm">
                 <li><Link to="/support" className="hover:text-primary transition-colors">Central de Ajuda</Link></li>
-                <li><a href="mailto:contato@meubolsopro.com" className="hover:text-primary transition-colors">contato@meubolsopro.com</a></li>
+                <li><a href="mailto:creativeproducoesbsb@gmail.com" className="hover:text-primary transition-colors">creativeproducoesbsb@gmail.com</a></li>
               </ul>
             </div>
             <div>

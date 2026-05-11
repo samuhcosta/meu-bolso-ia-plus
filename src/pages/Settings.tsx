@@ -5,8 +5,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useToast } from '@/hooks/use-toast';
 import { 
   User, 
@@ -17,11 +29,16 @@ import {
   Smartphone,
   Shield,
   CreditCard,
-  LogOut
+  LogOut,
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  MessageCircle
 } from 'lucide-react';
 
 const Settings = () => {
   const { user, updateUser, logout } = useAuth();
+  const { subscription, isPremium, cancelSubscription } = useSubscription();
   const { toast } = useToast();
   
   const [formData, setFormData] = useState({
@@ -32,6 +49,66 @@ const Settings = () => {
     newPassword: '',
     confirmPassword: ''
   });
+
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelSuccess, setCancelSuccess] = useState(false);
+
+  const handleCancelSubscription = async () => {
+    if (!cancelReason.trim()) {
+      toast({
+        title: "Motivo obrigatório",
+        description: "Por favor, conte-nos o motivo do cancelamento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCancelling(true);
+    const result = await cancelSubscription(cancelReason);
+    setIsCancelling(false);
+
+    if (result.success) {
+      setCancelSuccess(true);
+      toast({
+        title: "Assinatura cancelada",
+        description: "Sua assinatura será cancelada ao final do período vigente.",
+      });
+    } else {
+      toast({
+        title: "Erro ao cancelar",
+        description: result.error || "Tente novamente mais tarde.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
+  };
+
+  const getPlanLabel = () => {
+    if (!subscription) return 'Gratuito';
+    return subscription.plan_name || 'Pro';
+  };
+
+  const getBillingLabel = () => {
+    if (!subscription?.billing_cycle) return '';
+    return subscription.billing_cycle === 'annual' ? 'Anual' : 'Mensal';
+  };
+
+  const getStatusBadge = () => {
+    if (!subscription) return null;
+    if (subscription.cancel_at_period_end) {
+      return <Badge variant="outline" className="border-amber-500 text-amber-500">Cancelando</Badge>;
+    }
+    return <Badge variant="secondary" className="bg-secondary/10 text-secondary border-secondary/20">Ativo</Badge>;
+  };
 
   const [notifications, setNotifications] = useState({
     email: true,
@@ -277,7 +354,7 @@ const Settings = () => {
               <Switch
                 checked={notifications.whatsapp}
                 onCheckedChange={(value) => handleNotificationChange('whatsapp', value)}
-                disabled={user?.plan === 'free'}
+                disabled={!isPremium}
               />
             </div>
 
@@ -321,25 +398,161 @@ const Settings = () => {
             Informações sobre sua assinatura
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-medium text-lg capitalize">
-                Plano {user?.plan === 'free' ? 'Gratuito' : user?.plan}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {user?.plan === 'free' 
-                  ? 'Teste grátis por 5 dias'
-                  : 'Acesso completo a todas as funcionalidades'
-                }
-              </p>
+        <CardContent className="space-y-6">
+          {isPremium && subscription ? (
+            <>
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-medium text-lg capitalize">
+                      Plano {getPlanLabel()}
+                    </h3>
+                    {getStatusBadge()}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {getBillingLabel()} — Acesso completo a todas as funcionalidades
+                  </p>
+                </div>
+                <Link to="/plans">
+                  <Button variant="outline" size="sm">
+                    Gerenciar Plano
+                  </Button>
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Status</p>
+                  <p className="font-medium text-sm capitalize">
+                    {subscription.cancel_at_period_end ? 'Cancelamento solicitado' : subscription.status === 'active' ? 'Ativo' : subscription.status}
+                  </p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Próxima cobrança</p>
+                  <p className="font-medium text-sm">
+                    {subscription.current_period_end 
+                      ? formatDate(subscription.current_period_end)
+                      : '—'}
+                  </p>
+                </div>
+              </div>
+
+              {subscription.cancel_at_period_end ? (
+                <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                  <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-sm text-amber-600 dark:text-amber-400">
+                      Assinatura será cancelada
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Seu acesso ao Meu Bolso Pro continua até o final do período vigente em {subscription.current_period_end ? formatDate(subscription.current_period_end) : 'breve'}. Após essa data, seu plano será rebaixado para Gratuito.
+                    </p>
+                    <Link to="/plans">
+                      <Button variant="outline" size="sm" className="mt-3">
+                        Reativar Assinatura
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="pt-2">
+                  <Dialog open={cancelDialogOpen} onOpenChange={(open) => {
+                    if (!cancelSuccess) setCancelDialogOpen(open);
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="border-destructive/50 text-destructive hover:bg-destructive/10">
+                        Cancelar Assinatura
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Cancelar Assinatura</DialogTitle>
+                        <DialogDescription>
+                          Sua assinatura será cancelada ao final do período vigente. Você continuará tendo acesso a todos os recursos até lá.
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      {cancelSuccess ? (
+                        <div className="space-y-4 py-4">
+                          <div className="flex flex-col items-center text-center space-y-2">
+                            <CheckCircle2 className="h-12 w-12 text-secondary" />
+                            <p className="font-medium">Cancelamento solicitado com sucesso!</p>
+                            <p className="text-sm text-muted-foreground">
+                              Sua assinatura será cancelada em {subscription.current_period_end ? formatDate(subscription.current_period_end) : 'breve'}.
+                            </p>
+                          </div>
+                          <DialogFooter>
+                            <Button onClick={() => {
+                              setCancelDialogOpen(false);
+                              setCancelSuccess(false);
+                              setCancelReason('');
+                            }}>
+                              Fechar
+                            </Button>
+                          </DialogFooter>
+                        </div>
+                      ) : (
+                        <div className="space-y-4 py-2">
+                          <div className="space-y-2">
+                            <Label htmlFor="cancel-reason">
+                              Por que você está cancelando?
+                            </Label>
+                            <Textarea
+                              id="cancel-reason"
+                              placeholder="Conte-nos o motivo para melhorarmos nosso serviço..."
+                              value={cancelReason}
+                              onChange={(e) => setCancelReason(e.target.value)}
+                              className="min-h-[100px]"
+                            />
+                          </div>
+                          <DialogFooter className="gap-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                setCancelDialogOpen(false);
+                                setCancelReason('');
+                              }}
+                              disabled={isCancelling}
+                            >
+                              Voltar
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              onClick={handleCancelSubscription}
+                              disabled={isCancelling || !cancelReason.trim()}
+                            >
+                              {isCancelling ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Cancelando...
+                                </>
+                              ) : (
+                                'Confirmar Cancelamento'
+                              )}
+                            </Button>
+                          </DialogFooter>
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-lg">Plano Gratuito</h3>
+                <p className="text-sm text-muted-foreground">
+                  Teste grátis por 5 dias
+                </p>
+              </div>
+              <Link to="/plans">
+                <Button>
+                  Fazer Upgrade
+                </Button>
+              </Link>
             </div>
-            <Link to="/plans">
-              <Button variant={user?.plan === 'free' ? 'default' : 'outline'}>
-                {user?.plan === 'free' ? 'Fazer Upgrade' : 'Gerenciar Plano'}
-              </Button>
-            </Link>
-          </div>
+          )}
         </CardContent>
       </Card>
 
@@ -373,6 +586,35 @@ const Settings = () => {
             <Button variant="outline" size="sm">
               Configurar
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Support */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <MessageCircle className="w-5 h-5 mr-2" />
+            Suporte
+          </CardTitle>
+          <CardDescription>
+            Precisa de ajuda? Estamos aqui para você
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-medium">Fale conosco</h3>
+              <p className="text-sm text-muted-foreground">
+                Envie suas dúvidas ou sugestões por email
+              </p>
+            </div>
+            <a href="mailto:creativeproducoesbsb@gmail.com">
+              <Button variant="outline">
+                <Mail className="w-4 h-4 mr-2" />
+                creativeproducoesbsb@gmail.com
+              </Button>
+            </a>
           </div>
         </CardContent>
       </Card>

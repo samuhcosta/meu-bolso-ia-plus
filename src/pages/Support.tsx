@@ -129,7 +129,7 @@ const Support = () => {
                   Envie sua dúvida por email
                 </p>
                 <Button variant="outline" className="w-full">
-                  contato@meubolsopro.com
+                  creativeproducoesbsb@gmail.com
                 </Button>
                 <p className="text-xs text-muted-foreground mt-2">
                   <CheckCircle className="w-3 h-3 inline mr-1" />
