@@ -12,6 +12,7 @@ import Layout from "@/components/Layout";
 import LoadingScreen from "@/components/LoadingScreen";
 import ErrorScreen from "@/components/ErrorScreen";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import TrialExpiredScreen from "@/components/TrialExpiredScreen";
 
 // Pages
 import Index from "./pages/Index";
@@ -77,7 +78,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const PremiumRoute = ({ children }: { children: React.ReactNode }) => {
+const TrialFeatureRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading: authLoading } = useAuth();
   const { isPremium, isLoading: subLoading, trialExpired } = useSubscription();
   
@@ -89,9 +90,9 @@ const PremiumRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/login" replace />;
   }
   
-  // If not premium AND trial has expired, redirect to plans
+  // If not premium AND trial has expired, show block screen with upgrade message
   if (!isPremium && trialExpired) {
-    return <Navigate to="/plans" replace />;
+    return <TrialExpiredScreen />;
   }
   
   return <>{children}</>;
@@ -126,12 +127,12 @@ const AppContent = () => {
                               
                               {/* Protected Routes */}
                               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                              <Route path="/finances" element={<ProtectedRoute><Finances /></ProtectedRoute>} />
-                              <Route path="/debts" element={<ProtectedRoute><Debts /></ProtectedRoute>} />
-                              <Route path="/reports" element={<PremiumRoute><Reports /></PremiumRoute>} />
-                              <Route path="/goals" element={<ProtectedRoute><Goals /></ProtectedRoute>} />
-                              <Route path="/ai-assistant" element={<PremiumRoute><AIAssistant /></PremiumRoute>} />
-                              <Route path="/import" element={<PremiumRoute><Import /></PremiumRoute>} />
+                              <Route path="/finances" element={<TrialFeatureRoute><Finances /></TrialFeatureRoute>} />
+                              <Route path="/debts" element={<TrialFeatureRoute><Debts /></TrialFeatureRoute>} />
+                              <Route path="/reports" element={<TrialFeatureRoute><Reports /></TrialFeatureRoute>} />
+                              <Route path="/goals" element={<TrialFeatureRoute><Goals /></TrialFeatureRoute>} />
+                              <Route path="/ai-assistant" element={<TrialFeatureRoute><AIAssistant /></TrialFeatureRoute>} />
+                              <Route path="/import" element={<TrialFeatureRoute><Import /></TrialFeatureRoute>} />
                               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                               <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
                               

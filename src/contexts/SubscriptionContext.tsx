@@ -140,14 +140,20 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   let trialDaysLeft = 0;
   let trialExpired = false;
 
-  if (userCreatedAt && !isPremium) {
+  if (isPremium) {
+    trialDaysLeft = 0;
+    trialExpired = false;
+  } else if (userCreatedAt) {
     const createdDate = new Date(userCreatedAt);
     const currentDate = new Date();
-    const diffTime = Math.abs(currentDate.getTime() - createdDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+    const diffMs = currentDate.getTime() - createdDate.getTime();
+    const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
     trialDaysLeft = Math.max(0, trialDaysLimit - diffDays);
-    trialExpired = diffDays > trialDaysLimit;
+    trialExpired = diffDays >= trialDaysLimit;
+  } else {
+    // Ainda carregando o perfil - mostra 5 dias otimisticamente
+    trialDaysLeft = trialDaysLimit;
+    trialExpired = false;
   }
 
   const value = {
