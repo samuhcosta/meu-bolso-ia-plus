@@ -53,12 +53,12 @@ const Debts = () => {
       </div>
 
       <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="add-debt">Nova Dívida</TabsTrigger>
-          <TabsTrigger value="list">Minhas Dívidas</TabsTrigger>
-          <TabsTrigger value="installments">Cronograma</TabsTrigger>
-          <TabsTrigger value="reports">Relatórios</TabsTrigger>
+        <TabsList className="flex w-full overflow-x-auto gap-1 md:grid md:grid-cols-5 md:overflow-visible">
+          <TabsTrigger value="dashboard" className="flex-shrink-0">Dashboard</TabsTrigger>
+          <TabsTrigger value="add-debt" className="flex-shrink-0">Nova Dívida</TabsTrigger>
+          <TabsTrigger value="list" className="flex-shrink-0">Minhas Dívidas</TabsTrigger>
+          <TabsTrigger value="installments" className="flex-shrink-0">Cronograma</TabsTrigger>
+          <TabsTrigger value="reports" className="flex-shrink-0">Relatórios</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-6">
