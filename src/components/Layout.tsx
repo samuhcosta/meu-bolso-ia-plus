@@ -43,8 +43,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Entradas', href: '/finances?type=income', icon: ArrowUpCircle },
-    { name: 'Saídas', href: '/finances?type=expense', icon: ArrowDownCircle },
+    { name: 'Entradas', href: '/income', icon: ArrowUpCircle },
+    { name: 'Saídas', href: '/expenses', icon: ArrowDownCircle },
     { name: 'Dívidas', href: '/debts', icon: CreditCard },
     { name: 'Metas', href: '/goals', icon: Target },
     { name: 'Relatórios', href: '/reports', icon: FileText },

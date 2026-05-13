@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { SubscriptionProvider, useSubscription } from "@/contexts/SubscriptionContext";
 import { FinancialProvider } from "@/contexts/FinancialContext";
 import { DebtProvider } from "@/contexts/DebtContext";
+import { CategoryProvider } from "@/contexts/CategoryContext";
 import Layout from "@/components/Layout";
 import LoadingScreen from "@/components/LoadingScreen";
 import ErrorScreen from "@/components/ErrorScreen";
@@ -22,6 +23,8 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Finances from "./pages/Finances";
+import Income from "./pages/Income";
+import Expenses from "./pages/Expenses";
 import Debts from "./pages/Debts";
 import Reports from "./pages/Reports";
 import Goals from "./pages/Goals";
@@ -108,9 +111,10 @@ const AppContent = () => {
           <AuthProvider>
             <SubscriptionProvider>
               <ErrorBoundary>
-                <FinancialProvider>
-                  <ErrorBoundary>
-                    <DebtProvider>
+                <CategoryProvider>
+                  <FinancialProvider>
+                    <ErrorBoundary>
+                      <DebtProvider>
                       <BrowserRouter>
                         <ErrorBoundary>
                           <Layout>
@@ -128,6 +132,8 @@ const AppContent = () => {
                               {/* Protected Routes */}
                               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                               <Route path="/finances" element={<TrialFeatureRoute><Finances /></TrialFeatureRoute>} />
+                              <Route path="/income" element={<TrialFeatureRoute><Income /></TrialFeatureRoute>} />
+                              <Route path="/expenses" element={<TrialFeatureRoute><Expenses /></TrialFeatureRoute>} />
                               <Route path="/debts" element={<TrialFeatureRoute><Debts /></TrialFeatureRoute>} />
                               <Route path="/reports" element={<TrialFeatureRoute><Reports /></TrialFeatureRoute>} />
                               <Route path="/goals" element={<TrialFeatureRoute><Goals /></TrialFeatureRoute>} />
@@ -145,6 +151,7 @@ const AppContent = () => {
                     </DebtProvider>
                   </ErrorBoundary>
                 </FinancialProvider>
+                </CategoryProvider>
               </ErrorBoundary>
             </SubscriptionProvider>
           </AuthProvider>

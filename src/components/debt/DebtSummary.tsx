@@ -28,7 +28,7 @@ const DebtSummary: React.FC<DebtSummaryProps> = ({ debts, installments, loading 
   };
 
   const totalDebtAmount = debts.reduce((sum, debt) => sum + Number(debt.total_amount), 0);
-  const totalPaidAmount = debts.reduce((sum, debt) => sum + (Number(debt.installment_amount) * debt.paid_installments), 0);
+  const totalPaidAmount = debts.reduce((sum, debt) => sum + (Number(debt.installment_amount) * debt.paid_installments) + Number(debt.down_payment), 0);
   const totalRemainingAmount = totalDebtAmount - totalPaidAmount;
 
   // Next 30 days installments
@@ -127,8 +127,9 @@ const DebtSummary: React.FC<DebtSummaryProps> = ({ debts, installments, loading 
           </CardHeader>
           <CardContent className="space-y-4">
             {debts.map((debt) => {
-              const progress = (debt.paid_installments / debt.total_installments) * 100;
-              const isCompleted = debt.paid_installments >= debt.total_installments;
+              const paidAmount = (debt.paid_installments * debt.installment_amount) + debt.down_payment;
+              const progress = Math.min(Math.round((paidAmount / debt.total_amount) * 100), 100);
+              const isCompleted = paidAmount >= debt.total_amount;
               
               return (
                 <div key={debt.id} className="space-y-2">
@@ -144,8 +145,8 @@ const DebtSummary: React.FC<DebtSummaryProps> = ({ debts, installments, loading 
                   </div>
                   <Progress value={progress} className="h-2" />
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Pago: {formatCurrency(Number(debt.installment_amount) * debt.paid_installments)}</span>
-                    <span>Restante: {formatCurrency(Number(debt.installment_amount) * (debt.total_installments - debt.paid_installments))}</span>
+                    <span>Pago: {formatCurrency(paidAmount)}</span>
+                    <span>Restante: {formatCurrency(debt.total_amount - paidAmount)}</span>
                   </div>
                 </div>
               );

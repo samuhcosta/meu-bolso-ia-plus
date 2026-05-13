@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, Filter } from 'lucide-react';
-import { categories } from '@/contexts/FinancialContext';
 
 interface FiltersState {
   search: string;
@@ -17,11 +16,15 @@ interface FiltersState {
 
 interface TransactionFiltersProps {
   filters: FiltersState;
+  categories: string[];
+  hideTypeFilter?: boolean;
   onFilterChange: (field: string, value: string) => void;
 }
 
 const TransactionFilters: React.FC<TransactionFiltersProps> = ({
   filters,
+  categories,
+  hideTypeFilter,
   onFilterChange
 }) => {
   return (
@@ -65,20 +68,22 @@ const TransactionFilters: React.FC<TransactionFiltersProps> = ({
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Tipo</Label>
-            <Select value={filters.type} onValueChange={(value) => onFilterChange('type', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="income">Receita</SelectItem>
-                <SelectItem value="expense">Despesa</SelectItem>
-                <SelectItem value="transfer">Transferência</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {!hideTypeFilter && (
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Select value={filters.type} onValueChange={(value) => onFilterChange('type', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="income">Receita</SelectItem>
+                  <SelectItem value="expense">Despesa</SelectItem>
+                  <SelectItem value="transfer">Transferência</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Mês</Label>

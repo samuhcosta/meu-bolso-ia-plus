@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useDebt } from '@/contexts/DebtContext';
 import { useToast } from '@/hooks/use-toast';
 import DebtForm from '@/components/debt/DebtForm';
@@ -14,13 +15,10 @@ const Debts = () => {
   const { debts, installments, loading, deleteDebt } = useDebt();
   const { toast } = useToast();
   const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
+  const [debtToEdit, setDebtToEdit] = useState<Debt | null>(null);
 
   const handleEditDebt = (debt: Debt) => {
-    // For now, we'll just show a toast. The edit functionality can be added later
-    toast({
-      title: "Editar dívida",
-      description: "Funcionalidade de edição será implementada em breve.",
-    });
+    setDebtToEdit(debt);
   };
 
   const handleDeleteDebt = async (debtId: string) => {
@@ -126,6 +124,20 @@ const Debts = () => {
           <DebtReports debts={debts} installments={installments} />
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!debtToEdit} onOpenChange={(open) => { if (!open) setDebtToEdit(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Dívida</DialogTitle>
+          </DialogHeader>
+          {debtToEdit && (
+            <DebtForm
+              debt={debtToEdit}
+              onSave={() => setDebtToEdit(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

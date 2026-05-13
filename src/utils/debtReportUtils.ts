@@ -12,7 +12,7 @@ export const calculateCategoryData = (debts: Debt[]) => {
   const categoryData = debts.reduce((acc, debt) => {
     const category = debt.category;
     const total = debt.total_amount;
-    const paid = debt.paid_installments * debt.installment_amount;
+    const paid = (debt.paid_installments * debt.installment_amount) + debt.down_payment;
     
     if (!acc[category]) {
       acc[category] = { total: 0, paid: 0, remaining: 0 };
@@ -36,7 +36,7 @@ export const calculateCategoryData = (debts: Debt[]) => {
 
 export const calculateTotalStats = (debts: Debt[]) => {
   const totalDebts = debts.reduce((sum, debt) => sum + debt.total_amount, 0);
-  const totalPaid = debts.reduce((sum, debt) => sum + (debt.paid_installments * debt.installment_amount), 0);
+  const totalPaid = debts.reduce((sum, debt) => sum + (debt.paid_installments * debt.installment_amount) + debt.down_payment, 0);
   const totalRemaining = totalDebts - totalPaid;
   const overallProgress = totalDebts > 0 ? (totalPaid / totalDebts) * 100 : 0;
 

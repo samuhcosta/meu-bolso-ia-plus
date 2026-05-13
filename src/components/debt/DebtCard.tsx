@@ -30,8 +30,9 @@ const DebtCard: React.FC<DebtCardProps> = ({
   };
 
   const getDebtProgress = (debt: Debt) => {
-    const progress = (debt.paid_installments / debt.total_installments) * 100;
-    return Math.round(progress);
+    const paidAmount = (debt.paid_installments * debt.installment_amount) + debt.down_payment;
+    const progress = (paidAmount / debt.total_amount) * 100;
+    return Math.min(Math.round(progress), 100);
   };
 
   const getNextInstallment = (debt: Debt) => {
@@ -55,7 +56,7 @@ const DebtCard: React.FC<DebtCardProps> = ({
 
   const progress = getDebtProgress(debt);
   const nextInstallment = getNextInstallment(debt);
-  const remainingAmount = debt.total_amount - (debt.paid_installments * debt.installment_amount);
+  const remainingAmount = debt.total_amount - (debt.paid_installments * debt.installment_amount) - debt.down_payment;
 
   return (
     <Card className="hover:shadow-md transition-shadow">

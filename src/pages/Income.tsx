@@ -1,27 +1,25 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFinancial, Transaction } from '@/contexts/FinancialContext';
 import { useCategories } from '@/contexts/CategoryContext';
 import { useToast } from '@/hooks/use-toast';
-import { useSearchParams } from 'react-router-dom';
 import TransactionForm from '@/components/finance/TransactionForm';
-import FinancialSummary from '@/components/finance/FinancialSummary';
 import TransactionFilters from '@/components/finance/TransactionFilters';
 import TransactionList from '@/components/finance/TransactionList';
+import { Card, CardContent } from '@/components/ui/card';
+import { TrendingUp, ArrowUpCircle } from 'lucide-react';
 
-const Finances = () => {
+const Income = () => {
   const { transactions, addTransaction, updateTransaction, deleteTransaction } = useFinancial();
-  const { categories } = useCategories();
-  const [searchParams] = useSearchParams();
-  const typeParam = searchParams.get('type');
-  const [activeTab, setActiveTab] = useState('transactions');
+  const { getCategoriesByType } = useCategories();
   const { toast } = useToast();
 
-  const categoryNames = categories.map(c => c.name);
+  const categories = getCategoriesByType('income').map(c => c.name);
+  const [activeTab, setActiveTab] = useState('transactions');
 
   const [formData, setFormData] = useState({
-    type: (typeParam === 'income' ? 'income' : 'expense') as 'income' | 'expense' | 'transfer',
+    type: 'income' as 'income' | 'expense' | 'transfer',
     amount: '',
     category: '',
     description: '',
@@ -32,26 +30,10 @@ const Finances = () => {
   const [filters, setFilters] = useState({
     search: '',
     category: 'all',
-    type: typeParam || 'all',
-    month: typeParam ? new Date().getMonth().toString() : 'all',
+    type: 'income',
+    month: new Date().getMonth().toString(),
     year: new Date().getFullYear().toString()
   });
-
-  // Sincronizar filtros com parâmetros da URL quando mudarem
-  useEffect(() => {
-    const type = searchParams.get('type');
-    if (type) {
-      setFilters(prev => ({
-        ...prev,
-        type: type,
-        month: new Date().getMonth().toString() // Forçar mês atual ao usar links laterais
-      }));
-      setFormData(prev => ({
-        ...prev,
-        type: (type === 'income' ? 'income' : 'expense') as 'income' | 'expense' | 'transfer'
-      }));
-    }
-  }, [searchParams]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -74,7 +56,7 @@ const Finances = () => {
     }
 
     const transactionData = {
-      type: formData.type,
+      type: 'income' as const,
       amount: parseFloat(formData.amount),
       category: formData.category,
       description: formData.description,
@@ -89,7 +71,7 @@ const Finances = () => {
     }
 
     setFormData({
-      type: 'expense',
+      type: 'income',
       amount: '',
       category: '',
       description: '',
@@ -100,7 +82,7 @@ const Finances = () => {
 
   const handleEdit = (transaction: Transaction) => {
     setFormData({
-      type: transaction.type as 'income' | 'expense' | 'transfer',
+      type: 'income',
       amount: transaction.amount.toString(),
       category: transaction.category,
       description: transaction.description,
@@ -117,7 +99,7 @@ const Finances = () => {
   const handleCancel = () => {
     setEditingId(null);
     setFormData({
-      type: 'expense',
+      type: 'income',
       amount: '',
       category: '',
       description: '',
@@ -133,51 +115,60 @@ const Finances = () => {
     }).format(value);
   };
 
-  // Filter transactions
-  const filteredTransactions = transactions.filter(transaction => {
+  const incomeTransactions = transactions.filter(t => t.type === 'income');
+
+  const filteredTransactions = incomeTransactions.filter(transaction => {
     const matchesSearch = (transaction.description || '').toLowerCase().includes(filters.search.toLowerCase()) ||
                          (transaction.category || '').toLowerCase().includes(filters.search.toLowerCase());
     const matchesCategory = filters.category === 'all' || transaction.category === filters.category;
-    const matchesType = filters.type === 'all' || transaction.type === filters.type;
-    
+
     const transactionDate = new Date(transaction.date);
     const matchesMonth = filters.month === 'all' || transactionDate.getMonth() === parseInt(filters.month);
     const matchesYear = transactionDate.getFullYear().toString() === filters.year;
 
-    return matchesSearch && matchesCategory && matchesType && matchesMonth && matchesYear;
+    return matchesSearch && matchesCategory && matchesMonth && matchesYear;
   });
 
-  // Calculate totals
-  const totalIncome = filteredTransactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + Number(t.amount), 0);
-
-  const totalExpenses = filteredTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + Number(t.amount), 0);
-
-  const balance = totalIncome - totalExpenses;
+  const totalIncome = filteredTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Minhas Finanças</h1>
-        <p className="text-muted-foreground">
-          Gerencie suas transações e acompanhe seus gastos
-        </p>
+      <div className="flex items-center gap-3">
+        <div className="p-3 rounded-2xl bg-emerald-500/10">
+          <ArrowUpCircle className="w-8 h-8 text-emerald-500" />
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold text-emerald-500">Entradas</h1>
+          <p className="text-muted-foreground">
+            Gerencie suas receitas e acompanhe seus ganhos
+          </p>
+        </div>
       </div>
+
+      <Card className="border-emerald-500/20 bg-emerald-500/5">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-3">
+            <TrendingUp className="w-6 h-6 text-emerald-500" />
+            <div>
+              <p className="text-sm text-muted-foreground">Total de Receitas</p>
+              <p className="text-3xl font-bold text-emerald-500">{formatCurrency(totalIncome)}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="transactions">Minhas Transações</TabsTrigger>
-          <TabsTrigger value="add-transaction">Nova Transação</TabsTrigger>
+          <TabsTrigger value="transactions">Minhas Receitas</TabsTrigger>
+          <TabsTrigger value="add-transaction">Nova Receita</TabsTrigger>
         </TabsList>
 
         <TabsContent value="add-transaction" className="space-y-6">
           <TransactionForm
             formData={formData}
             editingId={editingId}
-            categories={categoryNames}
+            categories={categories}
+            lockedType="income"
             onInputChange={handleInputChange}
             onSubmit={handleSubmit}
             onCancel={handleCancel}
@@ -185,19 +176,10 @@ const Finances = () => {
         </TabsContent>
 
         <TabsContent value="transactions" className="space-y-6">
-          <FinancialSummary
-            totalIncome={totalIncome}
-            totalExpenses={totalExpenses}
-            balance={balance}
-            incomeTransactions={filteredTransactions.filter(t => t.type === 'income').length}
-            expenseTransactions={filteredTransactions.filter(t => t.type === 'expense').length}
-            totalTransactions={filteredTransactions.length}
-            formatCurrency={formatCurrency}
-          />
-
           <TransactionFilters
             filters={filters}
-            categories={categoryNames}
+            categories={categories}
+            hideTypeFilter
             onFilterChange={handleFilterChange}
           />
 
@@ -213,4 +195,4 @@ const Finances = () => {
   );
 };
 
-export default Finances;
+export default Income;

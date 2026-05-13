@@ -19,7 +19,7 @@ const DebtDashboardCards: React.FC<DebtDashboardCardsProps> = ({
   // Calcular totais
   const totalDebts = debts.reduce((sum, debt) => sum + debt.total_amount, 0);
   const paidAmount = debts.reduce((sum, debt) => 
-    sum + (debt.paid_installments * debt.installment_amount), 0
+    sum + (debt.paid_installments * debt.installment_amount) + debt.down_payment, 0
   );
   const activeDebts = totalDebts - paidAmount;
 

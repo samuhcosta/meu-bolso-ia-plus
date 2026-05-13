@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      categories: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          type: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          type: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          type?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       debt_installments: {
         Row: {
           amount: number
@@ -62,6 +86,7 @@ export type Database = {
         Row: {
           category: string
           created_at: string
+          down_payment: number
           first_installment_date: string
           id: string
           installment_amount: number
@@ -78,6 +103,7 @@ export type Database = {
         Insert: {
           category?: string
           created_at?: string
+          down_payment?: number
           first_installment_date?: string
           id?: string
           installment_amount?: number
@@ -94,6 +120,7 @@ export type Database = {
         Update: {
           category?: string
           created_at?: string
+          down_payment?: number
           first_installment_date?: string
           id?: string
           installment_amount?: number

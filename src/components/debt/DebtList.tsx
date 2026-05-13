@@ -97,9 +97,10 @@ const DebtList: React.FC<DebtListProps> = ({ debts, installments, loading, onSel
         <div className="space-y-4">
           {debts.map((debt) => {
             const nextInstallment = getNextInstallment(debt.id);
-            const progress = (debt.paid_installments / debt.total_installments) * 100;
-            const isCompleted = debt.paid_installments >= debt.total_installments;
-            const remainingAmount = Number(debt.installment_amount) * (debt.total_installments - debt.paid_installments);
+            const paidAmount = (debt.paid_installments * debt.installment_amount) + debt.down_payment;
+            const progress = Math.min(Math.round((paidAmount / debt.total_amount) * 100), 100);
+            const isCompleted = paidAmount >= debt.total_amount;
+            const remainingAmount = debt.total_amount - paidAmount;
 
             return (
               <div 

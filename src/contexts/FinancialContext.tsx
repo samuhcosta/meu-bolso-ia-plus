@@ -55,11 +55,6 @@ export const useFinancial = () => {
   return context;
 };
 
-export const categories = [
-  'Alimentação', 'Transporte', 'Moradia', 'Saúde', 'Educação', 
-  'Lazer', 'Roupas', 'Outros', 'Salário', 'Freelance', 'Investimentos'
-];
-
 export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -425,7 +420,8 @@ export const FinancialProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const totalDebts = debts.reduce((sum, d) => sum + Number(d.total_amount), 0);
     const paidDebts = installments
       .filter(i => i.is_paid)
-      .reduce((sum, i) => sum + Number(i.amount), 0);
+      .reduce((sum, i) => sum + Number(i.amount), 0) +
+      debts.reduce((sum, d) => sum + Number(d.down_payment), 0);
     
     const committedValues = installments
       .filter(i => !i.is_paid)

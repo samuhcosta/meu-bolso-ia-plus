@@ -12,16 +12,17 @@ import ReportControls from '@/components/reports/ReportControls';
 
 const Reports = () => {
   const { transactions } = useFinancial();
-  const [selectedPeriod, setSelectedPeriod] = useState('current-month');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [selectedMonth, setSelectedMonth] = useState('all');
+  const [selectedDay, setSelectedDay] = useState('all');
 
-  const filteredTransactions = getFilteredTransactions(transactions, selectedPeriod, selectedYear);
+  const filteredTransactions = getFilteredTransactions(transactions, selectedYear, selectedMonth, selectedDay);
   const { income, expenses, balance, topCategories } = calculateReportMetrics(filteredTransactions);
-  const monthlyData = getMonthlyData(transactions, selectedYear);
+  const monthlyData = getMonthlyData(transactions, selectedYear, selectedMonth);
 
   const exportToPDF = () => {
     generatePDF({
-      period: selectedPeriod,
+      period: selectedMonth === 'all' ? 'current-year' : 'current-month',
       year: selectedYear,
       income,
       expenses,
@@ -33,7 +34,7 @@ const Reports = () => {
 
   const exportToExcel = async () => {
     await generateExcel({
-      period: selectedPeriod,
+      period: selectedMonth === 'all' ? 'current-year' : 'current-month',
       year: selectedYear,
       income,
       expenses,
@@ -53,12 +54,14 @@ const Reports = () => {
             Análise detalhada das suas finanças
           </p>
         </div>
-        
+
         <ReportControls
-          selectedPeriod={selectedPeriod}
           selectedYear={selectedYear}
-          onPeriodChange={setSelectedPeriod}
+          selectedMonth={selectedMonth}
+          selectedDay={selectedDay}
           onYearChange={setSelectedYear}
+          onMonthChange={(value) => { setSelectedMonth(value); setSelectedDay('all'); }}
+          onDayChange={setSelectedDay}
           onExportPDF={exportToPDF}
           onExportExcel={exportToExcel}
         />

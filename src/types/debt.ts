@@ -7,6 +7,7 @@ export interface Debt {
   installment_amount: number;
   total_installments: number;
   paid_installments: number;
+  down_payment: number;
   first_installment_date: string;
   monthly_due_day: number;
   category: string;

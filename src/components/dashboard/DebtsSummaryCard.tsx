@@ -16,13 +16,13 @@ const DebtsSummaryCard: React.FC<DebtsSummaryCardProps> = ({
   installments,
   formatCurrency
 }) => {
-  const activeDebts = debts.filter(debt => debt.paid_installments < debt.total_installments);
+  const activeDebts = debts.filter(debt => (debt.paid_installments * debt.installment_amount) + debt.down_payment < debt.total_amount);
   const totalActiveDebt = activeDebts.reduce((sum, debt) => 
-    sum + (debt.total_amount - (debt.paid_installments * debt.installment_amount)), 0
+    sum + (debt.total_amount - (debt.paid_installments * debt.installment_amount) - debt.down_payment), 0
   );
   
   const totalPaidDebt = debts.reduce((sum, debt) => 
-    sum + (debt.paid_installments * debt.installment_amount), 0
+    sum + (debt.paid_installments * debt.installment_amount) + debt.down_payment, 0
   );
 
   const nextInstallment = installments

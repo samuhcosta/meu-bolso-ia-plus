@@ -10,29 +10,20 @@ export const formatCurrency = (value: number) => {
 
 export const getFilteredTransactions = (
   transactions: Transaction[],
-  selectedPeriod: string,
-  selectedYear: string
+  selectedYear: string,
+  selectedMonth: string,
+  selectedDay: string
 ) => {
-  const now = new Date();
   const year = parseInt(selectedYear);
-  
+
   return transactions.filter(t => {
     const date = new Date(t.date);
-    const transactionYear = date.getFullYear();
-    
-    if (transactionYear !== year) return false;
-    
-    switch (selectedPeriod) {
-      case 'current-month':
-        return date.getMonth() === now.getMonth() && transactionYear === now.getFullYear();
-      case 'last-month':
-        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1);
-        return date.getMonth() === lastMonth.getMonth() && transactionYear === lastMonth.getFullYear();
-      case 'current-year':
-        return transactionYear === year;
-      default:
-        return true;
-    }
+
+    if (date.getFullYear() !== year) return false;
+    if (selectedMonth !== 'all' && date.getMonth() !== parseInt(selectedMonth)) return false;
+    if (selectedDay !== 'all' && date.getDate() !== parseInt(selectedDay)) return false;
+
+    return true;
   });
 };
 
@@ -40,11 +31,11 @@ export const calculateReportMetrics = (filteredTransactions: Transaction[]) => {
   const income = filteredTransactions
     .filter(t => t.type === 'income')
     .reduce((sum, t) => sum + t.amount, 0);
-  
+
   const expenses = filteredTransactions
     .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0);
-  
+
   const balance = income - expenses;
 
   const categoryExpenses = filteredTransactions
@@ -67,22 +58,23 @@ export const calculateReportMetrics = (filteredTransactions: Transaction[]) => {
   };
 };
 
-export const getMonthlyData = (transactions: Transaction[], selectedYear: string) => {
-  return Array.from({ length: 12 }, (_, i) => {
-    const month = i;
+export const getMonthlyData = (transactions: Transaction[], selectedYear: string, selectedMonth: string) => {
+  const months = selectedMonth !== 'all' ? [parseInt(selectedMonth)] : Array.from({ length: 12 }, (_, i) => i);
+
+  return months.map(month => {
     const monthTransactions = transactions.filter(t => {
       const date = new Date(t.date);
       return date.getMonth() === month && date.getFullYear() === parseInt(selectedYear);
     });
-    
+
     const monthIncome = monthTransactions
       .filter(t => t.type === 'income')
       .reduce((sum, t) => sum + t.amount, 0);
-    
+
     const monthExpenses = monthTransactions
       .filter(t => t.type === 'expense')
       .reduce((sum, t) => sum + t.amount, 0);
-    
+
     return {
       month: new Date(2024, month).toLocaleDateString('pt-BR', { month: 'short' }),
       income: monthIncome,

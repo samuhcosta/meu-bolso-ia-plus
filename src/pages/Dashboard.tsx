@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useFinancial } from '@/contexts/FinancialContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +25,11 @@ import { Link } from 'react-router-dom';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { transactions, goals, debts, installments, getBalance, isLoading } = useFinancial();
+  const { transactions, goals, debts, installments, getBalance, isLoading, refreshData } = useFinancial();
+
+  useEffect(() => {
+    refreshData();
+  }, []);
 
   const balances = useMemo(() => getBalance(), [transactions, goals, debts, installments]);
 

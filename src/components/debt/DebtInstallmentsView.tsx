@@ -66,8 +66,8 @@ const DebtInstallmentsView: React.FC<DebtInstallmentsViewProps> = ({
 
   const paidInstallments = debtInstallments.filter(i => i.is_paid).length;
   const totalAmount = debt.total_amount;
-  const paidAmount = paidInstallments * debt.installment_amount;
-  const progress = (paidAmount / totalAmount) * 100;
+  const paidAmount = (paidInstallments * debt.installment_amount) + debt.down_payment;
+  const progress = Math.min(Math.round((paidAmount / totalAmount) * 100), 100);
 
   return (
     <div className="space-y-6">
