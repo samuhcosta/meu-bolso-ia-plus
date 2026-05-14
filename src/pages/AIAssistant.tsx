@@ -15,7 +15,7 @@ interface Message {
 }
 
 const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const MODEL = 'gemini-2.0-flash';
+const MODEL = 'gemini-2.5-flash';
 
 async function callGemini(contents: any[]): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_KEY}`;
