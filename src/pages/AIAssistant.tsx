@@ -101,7 +101,7 @@ const AIAssistant = () => {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const contextRef = useRef<{ data: string; time: number } | null>(null);
+  const contextRef = useRef<{ data: string; time: number; sent: boolean } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => { ref.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -116,33 +116,31 @@ const AIAssistant = () => {
     setLoading(true);
 
     try {
-      // Cache context for 60s to avoid re-fetching on every message
+      // Cache context for 60s
       if (!contextRef.current || Date.now() - contextRef.current.time > 60000) {
-        contextRef.current = { data: await fetchContext(user.id), time: Date.now() };
+        contextRef.current = { data: await fetchContext(user.id), time: Date.now(), sent: false };
       }
+
+      const needContext = !contextRef.current.sent;
+      if (needContext) contextRef.current.sent = true;
 
       const history = messages.slice(-4).filter(m => m.content.length < 500).map(m => ({
         role: m.role === 'user' ? 'user' as const : 'model' as const,
         parts: [{ text: m.content }],
       }));
 
-      const isFirstQuery = messages.length <= 1;
-
-      const prompt = isFirstQuery
-        ? `Analista financeiro. Dados do usuario (JSON): ${contextRef.current.data}
-
-Responda com analises e estrategias sobre gastos, receitas, metas e dividas.
-Nunca crie, altere ou exclua dados.
-Tom profissional, resposta curta e objetiva em portugues.`
-
-        : `(Contexto ja enviado anteriormente. Responda a pergunta do usuario com base na conversa.)`;
-
       const reply = await callGemini([
-        ...(isFirstQuery
-          ? [{ role: 'model' as const, parts: [{ text: 'Ok, tenho os dados. Vou analisar.' }] }]
+        ...(needContext
+          ? [{ role: 'user' as const, parts: [{ text: `VOCE E UM ANALISTA FINANCEIRO ESTRATEGICO. Abaixo estao TODOS os dados financeiros do usuario. Use-os para responder as perguntas. NUNCA peca para o usuario informar dados que ja estao aqui. Nao crie, altere ou exclua nada.
+
+DADOS DO USUARIO (JSON):
+${contextRef.current.data}
+
+Responda em portugues brasileiro, tom profissional, direto e objetivo.` }] },
+             { role: 'model' as const, parts: [{ text: 'Perfeito. Tenho todos os dados financeiros do usuario. Vou analisar e responder com base neles.' }] }]
           : []),
         ...history,
-        { role: 'user', parts: [{ text: isFirstQuery ? text : `[historico acima] ${text}` }] },
+        { role: 'user', parts: [{ text }] },
       ]);
 
       const msg: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: reply, timestamp: new Date() };
