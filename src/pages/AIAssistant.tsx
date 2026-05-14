@@ -26,17 +26,16 @@ async function callGemini(contents: any[]): Promise<string> {
   });
   const json = await res.json();
   if (!json.candidates?.length) {
-    throw new Error(json.error?.message || 'Erro ao processar mensagem');
+    throw new Error(json.error?.message || 'Erro ao processar');
   }
   return json.candidates[0].content.parts[0]?.text || '';
 }
 
 async function fetchContext(userId: string) {
-  const [transactions, goals, debts, installments] = await Promise.all([
+  const [transactions, goals, debts] = await Promise.all([
     supabase.from("transactions").select("*").eq("user_id", userId).then(r => r.data || []),
     supabase.from("goals").select("*").eq("user_id", userId).then(r => r.data || []),
     supabase.from("debts").select("*").eq("user_id", userId).then(r => r.data || []),
-    supabase.from("debt_installments").select("*, debts!inner(user_id)").eq("debts.user_id", userId).then(r => r.data || []),
   ]);
 
   const tx = transactions as any[];
@@ -52,50 +51,35 @@ async function fetchContext(userId: string) {
   const monthlyExpenses = monthly.filter((t: any) => t.type === "expense").reduce((s: number, t: any) => s + Number(t.amount), 0);
 
   const cats: Record<string, number> = {};
-  for (const t of tx.filter((t: any) => t.type === "expense")) {
+  for (const t of monthly.filter((t: any) => t.type === "expense")) {
     cats[t.category] = (cats[t.category] || 0) + Number(t.amount);
   }
   const topCats = Object.entries(cats).sort((a: any, b: any) => b[1] - a[1]).slice(0, 5);
 
-  const monthlyCats: Record<string, number> = {};
-  for (const t of monthly.filter((t: any) => t.type === "expense")) {
-    monthlyCats[t.category] = (monthlyCats[t.category] || 0) + Number(t.amount);
-  }
-  const topMonthlyCats = Object.entries(monthlyCats).sort((a: any, b: any) => b[1] - a[1]).slice(0, 5);
-
   const goalsData = (goals as any[]).map((g: any) => ({
-    titulo: g.title,
-    atual: Number(g.current_amount),
-    meta: Number(g.target_amount),
-    progresso: Math.min(Math.round((Number(g.current_amount) / Number(g.target_amount)) * 100), 100),
-    prazo: g.deadline,
+    t: g.title,
+    a: Number(g.current_amount),
+    m: Number(g.target_amount),
+    p: Math.min(Math.round((Number(g.current_amount) / Number(g.target_amount)) * 100), 100),
   }));
 
   const debtsData = (debts as any[]).map((d: any) => ({
-    nome: d.name,
-    total: Number(d.total_amount),
-    valor_parcela: Number(d.installment_amount),
-    parcelas_pagas: d.paid_installments,
-    total_parcelas: d.total_installments,
-    progresso: Math.min(Math.round((Number(d.paid_installments) / Number(d.total_installments)) * 100), 100),
+    n: d.name,
+    t: Number(d.total_amount),
+    pp: d.paid_installments,
+    tp: d.total_installments,
   }));
 
-  const paidInstallments = (installments as any[]).filter((i: any) => i.is_paid);
-  const pendingInstallments = (installments as any[]).filter((i: any) => !i.is_paid);
-
   return JSON.stringify({
-    saldo: allIncome - allExpenses,
-    receitas_total: allIncome,
-    despesas_total: allExpenses,
-    receitas_mes: monthlyIncome,
-    despesas_mes: monthlyExpenses,
-    categorias_geral: topCats.map(([c, a]: any) => ({ categoria: c, valor: a })),
-    categorias_mes: topMonthlyCats.map(([c, a]: any) => ({ categoria: c, valor: a })),
-    metas: goalsData,
-    dividas: debtsData,
-    parcelas_pagas: paidInstallments.length,
-    parcelas_pendentes: pendingInstallments.length,
-    total_transacoes: tx.length,
+    b: allIncome - allExpenses,
+    ri: allIncome,
+    re: allExpenses,
+    mi: monthlyIncome,
+    me: monthlyExpenses,
+    ct: topCats.map(([c, a]: any) => ({ c, a })),
+    g: goalsData,
+    d: debtsData,
+    tx: tx.length,
   });
 }
 
@@ -106,18 +90,13 @@ const AIAssistant = () => {
     {
       id: '1',
       role: 'assistant',
-      content: `Olá, ${user?.name || 'usuário'}! 👋
-
-Sou seu **Assistente Financeiro Estratégico**. Minha função é analisar seus dados financeiros, identificar oportunidades de melhoria e sugerir estratégias personalizadas para você organizar suas finanças.
-
-📊 *Posso ajudar com:* análises de gastos, tendências financeiras, saúde das suas metas, status das dívidas e dicas de economia baseadas no seu perfil.
-
-**Como posso te ajudar hoje?**`,
+      content: `Olá! Sou seu **Analista Financeiro Estratégico**. Posso analisar seus gastos, metas e dívidas, além de sugerir estratégias. O que você gostaria de saber?`,
       timestamp: new Date()
     }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const contextRef = useRef<{ data: string; time: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => { ref.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
@@ -132,35 +111,33 @@ Sou seu **Assistente Financeiro Estratégico**. Minha função é analisar seus 
     setLoading(true);
 
     try {
-      const context = await fetchContext(user.id);
+      // Cache context for 60s to avoid re-fetching on every message
+      if (!contextRef.current || Date.now() - contextRef.current.time > 60000) {
+        contextRef.current = { data: await fetchContext(user.id), time: Date.now() };
+      }
 
-      const history = messages.slice(-8).filter(m => m.content.length < 500).map(m => ({
+      const history = messages.slice(-4).filter(m => m.content.length < 500).map(m => ({
         role: m.role === 'user' ? 'user' as const : 'model' as const,
         parts: [{ text: m.content }],
       }));
 
-      const prompt = `Você é um Analista Financeiro Estratégico sênior, especialista em finanças pessoais.
+      const isFirstQuery = messages.length <= 1;
 
-Você recebeu os dados financeiros do usuário em formato JSON. Sua função é EXCLUSIVAMENTE analisar, interpretar e sugerir estratégias — você NUNCA cria, altera ou exclui nenhum dado.
+      const prompt = isFirstQuery
+        ? `Analista financeiro. Dados do usuario (JSON): ${contextRef.current.data}
 
-## Dados do usuário:
-${context}
+Responda com analises e estrategias sobre gastos, receitas, metas e dividas.
+Nunca crie, altere ou exclua dados.
+Tom profissional, resposta curta e objetiva em portugues.`
 
-## Regras:
-1. Analise os dados com profundidade — não se limite a repetir os números
-2. Identifique padrões, tendências e oportunidades de melhoria
-3. Sugira estratégias personalizadas baseadas nos hábitos reais do usuário
-4. Quando relevante, compare gastos atuais com meses anteriores
-5. Aponte riscos (ex: muitas parcelas pendentes, gastos altos em categorias não essenciais)
-6. Seja motivador mas honesto — se a situação financeira precisar de atenção, diga com clareza
-7. Responda em português brasileiro, tom profissional e amigável
-8. Use formatação simples com marcadores quando ajudar na legibilidade`;
+        : `(Contexto ja enviado anteriormente. Responda a pergunta do usuario com base na conversa.)`;
 
       const reply = await callGemini([
-        { role: 'user', parts: [{ text: prompt }] },
-        { role: 'model', parts: [{ text: 'Compreendo os dados. Estou pronto para analisar e sugerir estratégias financeiras personalizadas.' }] },
+        ...(isFirstQuery
+          ? [{ role: 'model' as const, parts: [{ text: 'Ok, tenho os dados. Vou analisar.' }] }]
+          : []),
         ...history,
-        { role: 'user', parts: [{ text }] },
+        { role: 'user', parts: [{ text: isFirstQuery ? text : `[historico acima] ${text}` }] },
       ]);
 
       const msg: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: reply, timestamp: new Date() };
