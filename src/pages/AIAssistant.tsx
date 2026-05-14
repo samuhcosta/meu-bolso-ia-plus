@@ -9,190 +9,79 @@ import { Bot, Send, MessageCircle, TrendingUp, TrendingDown, Target, Loader2 } f
 
 interface Message {
   id: string;
-  role: 'user' | 'model';
+  role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
 }
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`;
 
-const toolDefinitions = {
-  functionDeclarations: [
-    {
-      name: "getFinancialSummary",
-      description: "Obtém resumo financeiro completo: saldo, receitas/despesas do mês, total de transações, metas e dívidas.",
-      parameters: { type: "object", properties: {}, required: [] },
-    },
-    {
-      name: "getExpensesByCategory",
-      description: "Obtém despesas agrupadas por categoria.",
-      parameters: { type: "object", properties: {}, required: [] },
-    },
-    {
-      name: "getGoals",
-      description: "Obtém todas as metas com progresso.",
-      parameters: { type: "object", properties: {}, required: [] },
-    },
-    {
-      name: "getDebts",
-      description: "Obtém todas as dívidas com parcelas.",
-      parameters: { type: "object", properties: {}, required: [] },
-    },
-    {
-      name: "getRecentTransactions",
-      description: "Obtém as transações recentes (últimos 30 dias).",
-      parameters: {
-        type: "object",
-        properties: { limit: { type: "number", description: "Quantidade (padrão 10)" } },
-        required: [],
-      },
-    },
-    {
-      name: "createTransaction",
-      description: "Cria uma transação financeira (receita ou despesa).",
-      parameters: {
-        type: "object",
-        properties: {
-          type: { type: "string", enum: ["income", "expense"] },
-          amount: { type: "number" },
-          category: { type: "string" },
-          description: { type: "string" },
-          date: { type: "string", description: "YYYY-MM-DD (padrão hoje)" },
-        },
-        required: ["type", "amount", "category", "description"],
-      },
-    },
-  ],
-};
+async function fetchFinancialContext(userId: string): Promise<string> {
+  const [transactions, goals, debts] = await Promise.all([
+    supabase.from("transactions").select("*").eq("user_id", userId).then(r => r.data || []),
+    supabase.from("goals").select("*").eq("user_id", userId).then(r => r.data || []),
+    supabase.from("debts").select("*").eq("user_id", userId).then(r => r.data || []),
+  ]);
 
-async function executeTool(name: string, args: any, userId: string) {
-  switch (name) {
-    case "getFinancialSummary": {
-      const [transactions, goals, debts] = await Promise.all([
-        supabase.from("transactions").select("*").eq("user_id", userId).then(r => r.data || []),
-        supabase.from("goals").select("*").eq("user_id", userId).then(r => r.data || []),
-        supabase.from("debts").select("*").eq("user_id", userId).then(r => r.data || []),
-      ]);
+  const tx = transactions as any[];
+  const totalIncome = tx.filter((t: any) => t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0);
+  const totalExpenses = tx.filter((t: any) => t.type === "expense").reduce((s: number, t: any) => s + Number(t.amount), 0);
 
-      const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
+  const now = new Date();
+  const monthlyTx = tx.filter((t: any) => {
+    const d = new Date(t.date);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const monthlyIncome = monthlyTx.filter((t: any) => t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0);
+  const monthlyExpenses = monthlyTx.filter((t: any) => t.type === "expense").reduce((s: number, t: any) => s + Number(t.amount), 0);
 
-      const totalIncome = (transactions as any[])
-        .filter((t: any) => t.type === "income")
-        .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
-      const totalExpenses = (transactions as any[])
-        .filter((t: any) => t.type === "expense")
-        .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
-
-      const monthly = (transactions as any[]).filter((t: any) => {
-        const d = new Date(t.date);
-        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-      });
-      const monthlyIncome = monthly.filter((t: any) => t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0);
-      const monthlyExpenses = monthly.filter((t: any) => t.type === "expense").reduce((s: number, t: any) => s + Number(t.amount), 0);
-
-      return {
-        balance: totalIncome - totalExpenses,
-        totalIncome, totalExpenses,
-        monthlyIncome, monthlyExpenses,
-        totalTransactions: transactions.length,
-        totalGoals: goals.length,
-        totalDebts: debts.length,
-      };
-    }
-
-    case "getExpensesByCategory": {
-      const { data } = await supabase.from("transactions").select("*").eq("user_id", userId).eq("type", "expense");
-      const byCategory: Record<string, number> = {};
-      for (const t of (data || []) as any[]) {
-        byCategory[t.category] = (byCategory[t.category] || 0) + Number(t.amount);
-      }
-      return Object.entries(byCategory)
-        .map(([category, amount]) => ({ category, amount }))
-        .sort((a, b) => b.amount - a.amount);
-    }
-
-    case "getGoals": {
-      const { data } = await supabase.from("goals").select("*").eq("user_id", userId);
-      return ((data || []) as any[]).map((g: any) => ({
-        title: g.title,
-        targetAmount: Number(g.target_amount),
-        currentAmount: Number(g.current_amount),
-        progress: Math.min(Math.round((Number(g.current_amount) / Number(g.target_amount)) * 100), 100),
-        deadline: g.deadline,
-      }));
-    }
-
-    case "getDebts": {
-      const [debtsResult, installmentsResult] = await Promise.all([
-        supabase.from("debts").select("*").eq("user_id", userId),
-        supabase.from("debt_installments").select("*, debts!inner(user_id)").eq("debts.user_id", userId),
-      ]);
-      return ((debtsResult.data || []) as any[]).map((d: any) => ({
-        name: d.name,
-        totalAmount: Number(d.total_amount),
-        paidInstallments: d.paid_installments,
-        totalInstallments: d.total_installments,
-        installmentAmount: Number(d.installment_amount),
-        progress: Math.min(Math.round((Number(d.paid_installments) / Number(d.total_installments)) * 100), 100),
-      }));
-    }
-
-    case "getRecentTransactions": {
-      const limit = args.limit || 10;
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const { data } = await supabase
-        .from("transactions")
-        .select("*")
-        .eq("user_id", userId)
-        .gte("date", thirtyDaysAgo.toISOString().split("T")[0])
-        .order("date", { ascending: false })
-        .limit(limit);
-      return ((data || []) as any[]).map((t: any) => ({
-        type: t.type, amount: Number(t.amount), category: t.category, description: t.description, date: t.date,
-      }));
-    }
-
-    case "createTransaction": {
-      const { error } = await supabase.from("transactions").insert({
-        user_id: userId,
-        type: args.type,
-        amount: args.amount,
-        category: args.category,
-        description: args.description,
-        date: args.date || new Date().toISOString().split("T")[0],
-      });
-      return { success: !error, error: error?.message };
-    }
-
-    default:
-      return { error: "Função desconhecida" };
+  const byCategory: Record<string, number> = {};
+  for (const t of tx.filter((t: any) => t.type === "expense")) {
+    byCategory[t.category] = (byCategory[t.category] || 0) + Number(t.amount);
   }
+  const topCategories = Object.entries(byCategory)
+    .map(([c, a]) => ({ category: c, amount: a }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 5);
+
+  const goalsData = (goals as any[]).map((g: any) => ({
+    title: g.title,
+    current: Number(g.current_amount),
+    target: Number(g.target_amount),
+    progress: Math.min(Math.round((Number(g.current_amount) / Number(g.target_amount)) * 100), 100),
+  }));
+
+  const debtsData = (debts as any[]).map((d: any) => ({
+    name: d.name,
+    total: Number(d.total_amount),
+    paidInstallments: d.paid_installments,
+    totalInstallments: d.total_installments,
+  }));
+
+  return JSON.stringify({
+    balance: totalIncome - totalExpenses,
+    totalIncome,
+    totalExpenses,
+    monthlyIncome,
+    monthlyExpenses,
+    topCategories,
+    goals: goalsData,
+    debts: debtsData,
+    transactionCount: tx.length,
+  });
 }
 
-const systemPrompt = `Você é o assistente financeiro do Meu Bolso Pro, um app de finanças pessoais.
-Ajude o usuário a analisar gastos, criar transações, acompanhar metas e dívidas.
-Sempre responda em português brasileiro de forma amigável e direta.
-Use as funções disponíveis para buscar dados ou criar transações quando o usuário solicitar.
-Seja proativo em sugerir análises e dicas financeiras.`;
-
-async function callGemini(contents: any[], tools?: any) {
-  const res = await fetch(GEMINI_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents,
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      tools: tools || [toolDefinitions],
-    }),
+async function createTransactionAI(args: any, userId: string): Promise<string> {
+  const { error } = await supabase.from("transactions").insert({
+    user_id: userId,
+    type: args.type,
+    amount: args.amount,
+    category: args.category,
+    description: args.description,
+    date: args.date || new Date().toISOString().split("T")[0],
   });
-  const json = await res.json();
-  if (!json.candidates?.length) {
-    throw new Error(json.error?.message || "Erro ao processar mensagem");
-  }
-  return json;
+  return error ? `Erro: ${error.message}` : `Transação criada: ${args.type === "income" ? "receita" : "despesa"} de R$ ${args.amount} em "${args.category}" - ${args.description}`;
 }
 
 const AIAssistant = () => {
@@ -201,8 +90,8 @@ const AIAssistant = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      role: 'model',
-      content: `Olá, ${user?.name || 'usuário'}! Sou seu assistente financeiro inteligente. Posso te ajudar a analisar seus gastos, criar transações, acompanhar suas metas e muito mais. Como posso te ajudar hoje?`,
+      role: 'assistant',
+      content: `Olá, ${user?.name || 'usuário'}! Sou seu assistente financeiro. Posso analisar gastos, acompanhar metas e dívidas, e criar transações para você. Como posso ajudar?`,
       timestamp: new Date()
     }
   ]);
@@ -230,44 +119,113 @@ const AIAssistant = () => {
     setIsLoading(true);
 
     try {
-      const history = messages.slice(-20).map(m => ({
-        role: m.role,
-        parts: [{ text: m.content }],
-      }));
+      // Check if user wants to create a transaction
+      const lowerMsg = text.toLowerCase();
+      const createMatch = lowerMsg.match(/(registre|crie|criar|adicionar|adiciona|lançar|lança|inserir|insere|colocar|coloca)\s+(uma\s+)?(receita|entrada|ganho|renda|despesa|gasto|saída|conta|pagamento)/i);
+      const expenseKeywords = ['despesa', 'gasto', 'saída', 'conta', 'pagamento', 'transporte', 'alimentação', 'lazer', 'saúde', 'educação', 'moradia', 'assinatura', 'compras'];
+      const type = createMatch ? (createMatch[3] ? 'expense' : 'expense') : null;
+      const amountMatch = text.match(/(?:R?\$?\s*)?(\d+(?:[.,]\d{1,2})?)/);
 
-      const contents = [
-        ...history,
-        { role: "user", parts: [{ text }] },
-      ];
+      if (createMatch && amountMatch) {
+        const amount = parseFloat(amountMatch[1].replace(',', '.'));
+        const isIncome = /receita|entrada|ganho|renda/i.test(text);
+        const matchedCategory = expenseKeywords.find(k => text.toLowerCase().includes(k)) || 'Outros';
+        const result = await createTransactionAI({
+          type: isIncome ? 'income' : 'expense',
+          amount,
+          category: matchedCategory,
+          description: text.substring(0, 100),
+          date: new Date().toISOString().split('T')[0],
+        }, user.id);
 
-      const response = await callGemini(contents);
-      let part = response.candidates[0].content.parts[0];
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: `✅ ${result}`,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, aiMessage]);
+      } else {
+        // Fetch context and call Gemini
+        const context = await fetchFinancialContext(user.id);
 
-      if (part.functionCall) {
-        const fc = part.functionCall;
-        const result = await executeTool(fc.name, fc.args || {}, user.id);
+        const history = messages.slice(-10).map(m => ({
+          role: m.role === 'user' ? 'user' : 'model' as 'user' | 'model',
+          parts: [{ text: m.content }],
+        }));
 
-        const secondResponse = await callGemini([
-          ...contents,
-          { role: "model", parts: [{ functionCall: { name: fc.name, args: fc.args } }] },
-          { role: "user", parts: [{ functionResponse: { name: fc.name, response: result } }] },
-        ]);
+        const systemInstruction = `Você é um assistente financeiro. Dados do usuário (JSON): ${context}
 
-        part = secondResponse.candidates[0].content.parts[0];
+Com base nesses dados, responda perguntas sobre:
+- Saldo, receitas e despesas
+- Gastos por categoria
+- Metas financeiras
+- Dívidas e parcelas
+
+Se o usuário pedir para criar uma transação, responda exatamente: "CRIAR_TRANSACAO: <o que ele quer criar>"
+Responda em português brasileiro de forma amigável e direta.`;
+
+        const contents = [
+          { role: 'user', parts: [{ text: systemInstruction }] },
+          { role: 'model', parts: [{ text: 'Entendi! Tenho acesso aos dados financeiros. Posso analisar, responder perguntas e criar transações. Como posso ajudar?' }] },
+          ...history,
+          { role: 'user', parts: [{ text }] },
+        ];
+
+        const res = await fetch(GEMINI_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents }),
+        });
+
+        const json = await res.json();
+        if (!json.candidates?.length) {
+          throw new Error(json.error?.message || 'Erro ao processar mensagem');
+        }
+
+        let responseText = json.candidates[0].content.parts[0]?.text || '';
+
+        if (responseText.startsWith('CRIAR_TRANSACAO:')) {
+          const desc = responseText.replace('CRIAR_TRANSACAO:', '').trim();
+          const newAmountMatch = desc.match(/(?:R?\$?\s*)?(\d+(?:[.,]\d{1,2})?)/);
+          const newAmount = newAmountMatch ? parseFloat(newAmountMatch[1].replace(',', '.')) : 0;
+          const isExpenseType = expenseKeywords.some(k => desc.toLowerCase().includes(k));
+          const cat = expenseKeywords.find(k => desc.toLowerCase().includes(k)) || 'Outros';
+          const createResult = await createTransactionAI({
+            type: isExpenseType ? 'expense' : 'income',
+            amount: newAmount,
+            category: cat,
+            description: desc,
+          }, user.id);
+
+          const finalRes = await fetch(GEMINI_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                ...contents,
+                { role: 'model', parts: [{ text: responseText }] },
+                { role: 'user', parts: [{ text: `Resultado: ${createResult}. Explique para o usuário o que foi feito.` }] },
+              ],
+            }),
+          });
+
+          const finalJson = await finalRes.json();
+          responseText = finalJson.candidates?.[0]?.content?.parts?.[0]?.text || createResult;
+        }
+
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: responseText,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, aiMessage]);
       }
-
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'model',
-        content: part.text || "Operação realizada com sucesso!",
-        timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, aiMessage]);
     } catch (err: any) {
       toast({
         title: "Erro",
-        description: err.message || "Não foi possível processar sua mensagem.",
+        description: err.message || "Não foi possível processar.",
         variant: "destructive",
       });
     } finally {
@@ -286,28 +244,20 @@ const AIAssistant = () => {
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Assistente IA</h1>
-        <p className="text-muted-foreground">
-          Conversa inteligente sobre suas finanças com Gemini AI
-        </p>
+        <p className="text-muted-foreground">Converse sobre suas finanças</p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Perguntas Rápidas</CardTitle>
-          <CardDescription>
-            Clique em uma pergunta ou digite sua própria mensagem
-          </CardDescription>
+          <CardDescription>Clique em uma pergunta ou digite sua própria mensagem</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {quickQuestions.map((question, index) => (
-              <Button
-                key={index}
-                variant="outline"
-                size="sm"
+              <Button key={index} variant="outline" size="sm"
                 className="h-auto p-3 flex flex-col items-center space-y-2"
-                onClick={() => setInputMessage(question.text)}
-              >
+                onClick={() => setInputMessage(question.text)}>
                 <question.icon className="w-4 h-4" />
                 <span className="text-xs text-center">{question.text}</span>
               </Button>
@@ -326,28 +276,16 @@ const AIAssistant = () => {
 
         <CardContent className="flex-1 overflow-y-auto space-y-4">
           {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[80%] p-3 rounded-lg ${
-                  message.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground'
-                }`}
-              >
+            <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[80%] p-3 rounded-lg ${
+                message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+              }`}>
                 <div className="flex items-start space-x-2">
-                  {message.role === 'model' && (
-                    <Bot className="w-4 h-4 mt-1 flex-shrink-0 text-primary" />
-                  )}
+                  {message.role === 'assistant' && <Bot className="w-4 h-4 mt-1 flex-shrink-0 text-primary" />}
                   <div>
                     <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                     <p className="text-xs opacity-70 mt-1">
-                      {message.timestamp.toLocaleTimeString('pt-BR', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                      {message.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                 </div>
@@ -360,7 +298,7 @@ const AIAssistant = () => {
                 <div className="flex items-center gap-2">
                   <Bot className="w-4 h-4 text-primary" />
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm">Pensando...</span>
+                  <span className="text-sm">Analisando dados...</span>
                 </div>
               </div>
             </div>
@@ -370,14 +308,10 @@ const AIAssistant = () => {
 
         <div className="p-4 border-t">
           <div className="flex space-x-2">
-            <Input
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
+            <Input value={inputMessage} onChange={e => setInputMessage(e.target.value)}
               placeholder="Digite sua pergunta sobre finanças..."
-              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-              className="flex-1"
-              disabled={isLoading}
-            />
+              onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+              className="flex-1" disabled={isLoading} />
             <Button onClick={handleSendMessage} disabled={!inputMessage.trim() || isLoading}>
               <Send className="w-4 h-4" />
             </Button>
@@ -390,13 +324,12 @@ const AIAssistant = () => {
           <div className="flex items-start space-x-3">
             <MessageCircle className="w-5 h-5 text-primary mt-1" />
             <div>
-              <h3 className="font-medium mb-2">💡 O que a IA pode fazer agora</h3>
+              <h3 className="font-medium mb-2">💡 Como usar</h3>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• <strong>Analisar gastos:</strong> "Onde gastei mais este mês?"</li>
-                <li>• <strong>Criar transações:</strong> "Registre uma despesa de R$ 50 de transporte"</li>
-                <li>• <strong>Ver saldo:</strong> "Qual meu saldo atual?"</li>
-                <li>• <strong>Acompanhar metas e dívidas:</strong> "Como estão minhas metas?"</li>
-                <li>• <strong>Dicas de economia:</strong> "Como posso economizar?"</li>
+                <li>• Pergunte: "Onde gastei mais este mês?"</li>
+                <li>• Peça: "Registre uma despesa de R$ 50 de transporte"</li>
+                <li>• Pergunte: "Qual meu saldo?" ou "Resumo financeiro"</li>
+                <li>• Acompanhe: "Como estão minhas metas?"</li>
               </ul>
             </div>
           </div>
