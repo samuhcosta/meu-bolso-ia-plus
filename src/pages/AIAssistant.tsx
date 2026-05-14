@@ -44,8 +44,8 @@ async function fetchContext(userId: string) {
   ]);
 
   const tx = transactions as any[];
-  const allIncome = tx.filter((t: any) => t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0);
-  const allExpenses = tx.filter((t: any) => t.type === "expense").reduce((s: number, t: any) => s + Number(t.amount), 0);
+  const totalIncome = tx.filter((t: any) => t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0);
+  const totalExpenses = tx.filter((t: any) => t.type === "expense").reduce((s: number, t: any) => s + Number(t.amount), 0);
 
   const now = new Date();
   const monthly = tx.filter((t: any) => {
@@ -62,30 +62,30 @@ async function fetchContext(userId: string) {
   const topCats = Object.entries(cats).sort((a: any, b: any) => b[1] - a[1]).slice(0, 5);
 
   const goalsData = (goals as any[]).map((g: any) => ({
-    t: g.title,
-    a: Number(g.current_amount),
-    m: Number(g.target_amount),
-    p: Math.min(Math.round((Number(g.current_amount) / Number(g.target_amount)) * 100), 100),
+    titulo: g.title,
+    valor_atual: Number(g.current_amount),
+    valor_meta: Number(g.target_amount),
+    progresso_percentual: Math.min(Math.round((Number(g.current_amount) / Number(g.target_amount)) * 100), 100),
   }));
 
   const debtsData = (debts as any[]).map((d: any) => ({
-    n: d.name,
-    t: Number(d.total_amount),
-    pp: d.paid_installments,
-    tp: d.total_installments,
+    nome: d.name,
+    valor_total: Number(d.total_amount),
+    parcelas_pagas: d.paid_installments,
+    total_parcelas: d.total_installments,
   }));
 
-  return JSON.stringify({
-    b: allIncome - allExpenses,
-    ri: allIncome,
-    re: allExpenses,
-    mi: monthlyIncome,
-    me: monthlyExpenses,
-    ct: topCats.map(([c, a]: any) => ({ c, a })),
-    g: goalsData,
-    d: debtsData,
-    tx: tx.length,
-  });
+  const categorias = topCats.map(([cat, val]: any) => `${cat}: R$ ${val.toFixed(2)}`).join("; ");
+
+  return `Saldo total: R$ ${(totalIncome - totalExpenses).toFixed(2)}
+Receitas totais: R$ ${totalIncome.toFixed(2)}
+Despesas totais: R$ ${totalExpenses.toFixed(2)}
+Receitas deste mes: R$ ${monthlyIncome.toFixed(2)}
+Despesas deste mes: R$ ${monthlyExpenses.toFixed(2)}
+Categorias com mais gastos no mes: ${categorias || "nenhuma"}
+Metas: ${goalsData.map((g: any) => `${g.titulo} (${g.progresso_percentual}%)`).join(", ") || "nenhuma"}
+Dividas: ${debtsData.map((d: any) => `${d.nome} - ${d.parcelas_pagas}/${d.total_parcelas} parcelas`).join(", ") || "nenhuma"}
+Total de transacoes registradas: ${tx.length}`;
 }
 
 const AIAssistant = () => {
@@ -124,23 +124,28 @@ const AIAssistant = () => {
       const needContext = !contextRef.current.sent;
       if (needContext) contextRef.current.sent = true;
 
-      const history = messages.slice(-4).filter(m => m.content.length < 500).map(m => ({
+      // Build history skipping welcome message (index 0)
+      const chatMessages = messages.slice(1);
+      const history = chatMessages.slice(-6).map(m => ({
         role: m.role === 'user' ? 'user' as const : 'model' as const,
         parts: [{ text: m.content }],
       }));
 
       const reply = await callGemini([
         ...(needContext
-          ? [{ role: 'user' as const, parts: [{ text: `VOCE E UM ANALISTA FINANCEIRO ESTRATEGICO. Abaixo estao TODOS os dados financeiros do usuario. Use-os para responder as perguntas. NUNCA peca para o usuario informar dados que ja estao aqui. Nao crie, altere ou exclua nada.
+          ? [{ role: 'user' as const, parts: [{ text: `VOCE E UM ANALISTA FINANCEIRO ESTRATEGICO.
 
-DADOS DO USUARIO (JSON):
+DADOS FINANCEIROS DO USUARIO:
 ${contextRef.current.data}
 
-Responda em portugues brasileiro, tom profissional, direto e objetivo.` }] },
-             { role: 'model' as const, parts: [{ text: 'Perfeito. Tenho todos os dados financeiros do usuario. Vou analisar e responder com base neles.' }] }]
+INSTRUCOES:
+- Use SOMENTE os dados acima para responder. NUNCA peca para o usuario informar dados que ja estao aqui.
+- Analise saldo, receitas, despesas, categorias, metas e divididas.
+- Sugira estrategias, aponte riscos e oportunidades.
+- Nao crie, altere ou exclua nada.
+- Responda em portugues brasileiro, tom profissional e direto.` }] }]
           : []),
         ...history,
-        { role: 'user', parts: [{ text }] },
       ]);
 
       const msg: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: reply, timestamp: new Date() };
