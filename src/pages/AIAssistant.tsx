@@ -14,6 +14,187 @@ interface Message {
   timestamp: Date;
 }
 
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+const toolDefinitions = {
+  functionDeclarations: [
+    {
+      name: "getFinancialSummary",
+      description: "Obtém resumo financeiro completo: saldo, receitas/despesas do mês, total de transações, metas e dívidas.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+    {
+      name: "getExpensesByCategory",
+      description: "Obtém despesas agrupadas por categoria.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+    {
+      name: "getGoals",
+      description: "Obtém todas as metas com progresso.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+    {
+      name: "getDebts",
+      description: "Obtém todas as dívidas com parcelas.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+    {
+      name: "getRecentTransactions",
+      description: "Obtém as transações recentes (últimos 30 dias).",
+      parameters: {
+        type: "object",
+        properties: { limit: { type: "number", description: "Quantidade (padrão 10)" } },
+        required: [],
+      },
+    },
+    {
+      name: "createTransaction",
+      description: "Cria uma transação financeira (receita ou despesa).",
+      parameters: {
+        type: "object",
+        properties: {
+          type: { type: "string", enum: ["income", "expense"] },
+          amount: { type: "number" },
+          category: { type: "string" },
+          description: { type: "string" },
+          date: { type: "string", description: "YYYY-MM-DD (padrão hoje)" },
+        },
+        required: ["type", "amount", "category", "description"],
+      },
+    },
+  ],
+};
+
+async function executeTool(name: string, args: any, userId: string) {
+  switch (name) {
+    case "getFinancialSummary": {
+      const [transactions, goals, debts] = await Promise.all([
+        supabase.from("transactions").select("*").eq("user_id", userId).then(r => r.data || []),
+        supabase.from("goals").select("*").eq("user_id", userId).then(r => r.data || []),
+        supabase.from("debts").select("*").eq("user_id", userId).then(r => r.data || []),
+      ]);
+
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+
+      const totalIncome = (transactions as any[])
+        .filter((t: any) => t.type === "income")
+        .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+      const totalExpenses = (transactions as any[])
+        .filter((t: any) => t.type === "expense")
+        .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+
+      const monthly = (transactions as any[]).filter((t: any) => {
+        const d = new Date(t.date);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      });
+      const monthlyIncome = monthly.filter((t: any) => t.type === "income").reduce((s: number, t: any) => s + Number(t.amount), 0);
+      const monthlyExpenses = monthly.filter((t: any) => t.type === "expense").reduce((s: number, t: any) => s + Number(t.amount), 0);
+
+      return {
+        balance: totalIncome - totalExpenses,
+        totalIncome, totalExpenses,
+        monthlyIncome, monthlyExpenses,
+        totalTransactions: transactions.length,
+        totalGoals: goals.length,
+        totalDebts: debts.length,
+      };
+    }
+
+    case "getExpensesByCategory": {
+      const { data } = await supabase.from("transactions").select("*").eq("user_id", userId).eq("type", "expense");
+      const byCategory: Record<string, number> = {};
+      for (const t of (data || []) as any[]) {
+        byCategory[t.category] = (byCategory[t.category] || 0) + Number(t.amount);
+      }
+      return Object.entries(byCategory)
+        .map(([category, amount]) => ({ category, amount }))
+        .sort((a, b) => b.amount - a.amount);
+    }
+
+    case "getGoals": {
+      const { data } = await supabase.from("goals").select("*").eq("user_id", userId);
+      return ((data || []) as any[]).map((g: any) => ({
+        title: g.title,
+        targetAmount: Number(g.target_amount),
+        currentAmount: Number(g.current_amount),
+        progress: Math.min(Math.round((Number(g.current_amount) / Number(g.target_amount)) * 100), 100),
+        deadline: g.deadline,
+      }));
+    }
+
+    case "getDebts": {
+      const [debtsResult, installmentsResult] = await Promise.all([
+        supabase.from("debts").select("*").eq("user_id", userId),
+        supabase.from("debt_installments").select("*, debts!inner(user_id)").eq("debts.user_id", userId),
+      ]);
+      return ((debtsResult.data || []) as any[]).map((d: any) => ({
+        name: d.name,
+        totalAmount: Number(d.total_amount),
+        paidInstallments: d.paid_installments,
+        totalInstallments: d.total_installments,
+        installmentAmount: Number(d.installment_amount),
+        progress: Math.min(Math.round((Number(d.paid_installments) / Number(d.total_installments)) * 100), 100),
+      }));
+    }
+
+    case "getRecentTransactions": {
+      const limit = args.limit || 10;
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const { data } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", userId)
+        .gte("date", thirtyDaysAgo.toISOString().split("T")[0])
+        .order("date", { ascending: false })
+        .limit(limit);
+      return ((data || []) as any[]).map((t: any) => ({
+        type: t.type, amount: Number(t.amount), category: t.category, description: t.description, date: t.date,
+      }));
+    }
+
+    case "createTransaction": {
+      const { error } = await supabase.from("transactions").insert({
+        user_id: userId,
+        type: args.type,
+        amount: args.amount,
+        category: args.category,
+        description: args.description,
+        date: args.date || new Date().toISOString().split("T")[0],
+      });
+      return { success: !error, error: error?.message };
+    }
+
+    default:
+      return { error: "Função desconhecida" };
+  }
+}
+
+const systemPrompt = `Você é o assistente financeiro do Meu Bolso Pro, um app de finanças pessoais.
+Ajude o usuário a analisar gastos, criar transações, acompanhar metas e dívidas.
+Sempre responda em português brasileiro de forma amigável e direta.
+Use as funções disponíveis para buscar dados ou criar transações quando o usuário solicitar.
+Seja proativo em sugerir análises e dicas financeiras.`;
+
+async function callGemini(contents: any[], tools?: any) {
+  const res = await fetch(GEMINI_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents,
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      tools: tools || [toolDefinitions],
+    }),
+  });
+  const json = await res.json();
+  if (!json.candidates?.length) {
+    throw new Error(json.error?.message || "Erro ao processar mensagem");
+  }
+  return json;
+}
+
 const AIAssistant = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -35,7 +216,7 @@ const AIAssistant = () => {
 
   const handleSendMessage = async () => {
     const text = inputMessage.trim();
-    if (!text || isLoading) return;
+    if (!text || isLoading || !user) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -51,24 +232,34 @@ const AIAssistant = () => {
     try {
       const history = messages.slice(-20).map(m => ({
         role: m.role,
-        content: m.content
+        parts: [{ text: m.content }],
       }));
 
-      const { data, error } = await supabase.functions.invoke('ai-chat', {
-        body: {
-          message: text,
-          history,
-          geminiKey: import.meta.env.VITE_GEMINI_API_KEY || null
-        }
-      });
+      const contents = [
+        ...history,
+        { role: "user", parts: [{ text }] },
+      ];
 
-      if (error) throw new Error(error.message);
-      if (!data?.success) throw new Error(data?.error || 'Erro ao processar mensagem');
+      const response = await callGemini(contents);
+      let part = response.candidates[0].content.parts[0];
+
+      if (part.functionCall) {
+        const fc = part.functionCall;
+        const result = await executeTool(fc.name, fc.args || {}, user.id);
+
+        const secondResponse = await callGemini([
+          ...contents,
+          { role: "model", parts: [{ functionCall: { name: fc.name, args: fc.args } }] },
+          { role: "user", parts: [{ functionResponse: { name: fc.name, response: result } }] },
+        ]);
+
+        part = secondResponse.candidates[0].content.parts[0];
+      }
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        content: data.response,
+        content: part.text || "Operação realizada com sucesso!",
         timestamp: new Date()
       };
 
