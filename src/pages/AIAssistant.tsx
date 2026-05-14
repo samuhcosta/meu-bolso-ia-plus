@@ -15,7 +15,39 @@ interface Message {
 }
 
 const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
+const GEMINI_MODELS = [
+  'gemini-2.0-flash',
+  'gemini-2.5-flash',
+  'gemini-1.5-flash',
+];
+
+async function callGemini(contents: any[]): Promise<any> {
+  let lastError: any;
+
+  for (const model of GEMINI_MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents }),
+      });
+      const json = await res.json();
+
+      if (json.candidates?.length) return json;
+      if (json.error?.message?.includes('not found') || json.error?.message?.includes('high demand')) {
+        lastError = json.error;
+        continue;
+      }
+      return json;
+    } catch (e) {
+      lastError = e;
+      continue;
+    }
+  }
+
+  throw new Error(lastError?.message || 'Todos os modelos estão indisponíveis. Tente novamente.');
+}
 
 async function fetchFinancialContext(userId: string): Promise<string> {
   const [transactions, goals, debts] = await Promise.all([
@@ -172,17 +204,7 @@ Responda em português brasileiro de forma amigável e direta.`;
           { role: 'user', parts: [{ text }] },
         ];
 
-        const res = await fetch(GEMINI_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents }),
-        });
-
-        const json = await res.json();
-        if (!json.candidates?.length) {
-          throw new Error(json.error?.message || 'Erro ao processar mensagem');
-        }
-
+        const json = await callGemini(contents);
         let responseText = json.candidates[0].content.parts[0]?.text || '';
 
         if (responseText.startsWith('CRIAR_TRANSACAO:')) {
@@ -198,19 +220,11 @@ Responda em português brasileiro de forma amigável e direta.`;
             description: desc,
           }, user.id);
 
-          const finalRes = await fetch(GEMINI_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [
-                ...contents,
-                { role: 'model', parts: [{ text: responseText }] },
-                { role: 'user', parts: [{ text: `Resultado: ${createResult}. Explique para o usuário o que foi feito.` }] },
-              ],
-            }),
-          });
-
-          const finalJson = await finalRes.json();
+          const finalJson = await callGemini([
+            ...contents,
+            { role: 'model', parts: [{ text: responseText }] },
+            { role: 'user', parts: [{ text: `Resultado: ${createResult}. Explique para o usuário o que foi feito.` }] },
+          ]);
           responseText = finalJson.candidates?.[0]?.content?.parts?.[0]?.text || createResult;
         }
 
