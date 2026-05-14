@@ -113,7 +113,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const { data, error: invokeError } = await supabase.functions.invoke('create-checkout-session', {
         body: { 
           priceId, 
-          returnUrl: window.location.origin 
+          returnUrl: window.location.origin,
         },
       });
 

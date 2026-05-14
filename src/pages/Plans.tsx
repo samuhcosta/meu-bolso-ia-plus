@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Star, DollarSign, Loader2, Zap } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { CheckCircle, Star, DollarSign, Loader2, Zap, Tag, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { Switch } from '@/components/ui/switch';
@@ -11,10 +12,35 @@ import { Label } from '@/components/ui/label';
 const Plans = () => {
   const [isAnnual, setIsAnnual] = useState(true);
   const [loadingPriceId, setLoadingPriceId] = useState<string | null>(null);
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState('');
   const { checkout, subscription } = useSubscription();
 
   const PRICE_ID_MONTHLY = import.meta.env.VITE_STRIPE_PRICE_ID_MONTHLY;
   const PRICE_ID_ANNUAL = import.meta.env.VITE_STRIPE_PRICE_ID_ANNUAL;
+  const PRICE_ID_MONTHLY_PROMO = import.meta.env.VITE_STRIPE_PRICE_ID_MONTHLY_PROMO;
+  const PRICE_ID_ANNUAL_PROMO = import.meta.env.VITE_STRIPE_PRICE_ID_ANNUAL_PROMO;
+  const COUPON_CODE = 'PROMO40OFF';
+
+  const hasCoupon = appliedCoupon.toUpperCase() === COUPON_CODE;
+
+  const applyCoupon = () => {
+    if (couponCode.toUpperCase() === COUPON_CODE) {
+      setAppliedCoupon(couponCode.toUpperCase());
+    } else {
+      setAppliedCoupon('');
+    }
+  };
+
+  const removeCoupon = () => {
+    setCouponCode('');
+    setAppliedCoupon('');
+  };
+
+  const normalMonthly = 49.90;
+  const normalAnnual = 538.90;
+  const couponMonthly = 29.90;
+  const couponAnnual = 322.90;
 
   const handleSubscribe = async (priceId: string) => {
     setLoadingPriceId(priceId);
@@ -25,7 +51,9 @@ const Plans = () => {
     }
   };
 
-  const currentPriceId = isAnnual ? PRICE_ID_ANNUAL : PRICE_ID_MONTHLY;
+  const currentPriceId = hasCoupon
+    ? isAnnual ? PRICE_ID_ANNUAL_PROMO : PRICE_ID_MONTHLY_PROMO
+    : isAnnual ? PRICE_ID_ANNUAL : PRICE_ID_MONTHLY;
   const isCurrentPlan = subscription?.stripe_price_id === currentPriceId && subscription?.status === 'active';
 
   const plans = [
@@ -51,10 +79,23 @@ const Plans = () => {
     },
     {
       name: 'Pro',
-      price: isAnnual ? 'R$ 197,00' : 'R$ 19,90',
+      price: hasCoupon
+        ? isAnnual
+          ? `R$ ${couponAnnual.toFixed(2).replace('.', ',')}`
+          : `R$ ${couponMonthly.toFixed(2).replace('.', ',')}`
+        : isAnnual
+          ? `R$ ${normalAnnual.toFixed(2).replace('.', ',')}`
+          : `R$ ${normalMonthly.toFixed(2).replace('.', ',')}`,
+      originalPrice: hasCoupon
+        ? isAnnual
+          ? `R$ ${normalAnnual.toFixed(2).replace('.', ',')}`
+          : `R$ ${normalMonthly.toFixed(2).replace('.', ',')}`
+        : null,
       period: isAnnual ? '/ano' : '/mês',
-      description: isAnnual 
-        ? 'Economize pagando anualmente — equivale a R$ 16,42/mês' 
+      description: isAnnual
+        ? hasCoupon
+          ? `Equivale a R$ ${(couponAnnual / 12).toFixed(2).replace('.', ',')}/mês`
+          : `Equivale a R$ ${(normalAnnual / 12).toFixed(2).replace('.', ',')}/mês`
         : 'Acesso completo a todas as funcionalidades',
       features: [
         'Lançamentos ilimitados',
@@ -72,7 +113,11 @@ const Plans = () => {
       buttonText: isCurrentPlan ? 'Plano Atual' : 'Assinar Agora',
       priceId: currentPriceId,
       popular: true,
-      savings: isAnnual ? 'Economize R$ 41,80/ano' : null,
+      savings: isAnnual
+        ? hasCoupon
+          ? `Economize R$ ${((couponMonthly * 12) - couponAnnual).toFixed(2).replace('.', ',')}/ano`
+          : `Economize R$ ${((normalMonthly * 12) - normalAnnual).toFixed(2).replace('.', ',')}/ano`
+        : null,
     },
   ];
 
@@ -121,8 +166,35 @@ const Plans = () => {
             </div>
             {isAnnual && (
               <p className="text-sm text-primary font-medium">
-                💰 Economize R$ 41,80 por ano pagando anualmente!
+                💰 Economize R$ {((normalMonthly * 12) - normalAnnual).toFixed(2).replace('.', ',')} por ano pagando anualmente!
               </p>
+            )}
+          </div>
+
+          {/* Coupon Section */}
+          <div className="max-w-md mx-auto mb-8">
+            {!hasCoupon ? (
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Digite seu cupom"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && applyCoupon()}
+                  className="flex-1"
+                />
+                <Button onClick={applyCoupon} variant="outline" className="gap-2">
+                  <Tag className="w-4 h-4" />
+                  Aplicar
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-lg">
+                <Tag className="w-4 h-4" />
+                <span className="font-medium">Cupom {appliedCoupon} aplicado!</span>
+                <Button variant="ghost" size="icon" className="h-6 w-6 ml-1" onClick={removeCoupon}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
             )}
           </div>
 
@@ -147,6 +219,11 @@ const Plans = () => {
                 <CardHeader className="text-center pb-6">
                   <CardTitle className="text-2xl mb-2">{plan.name}</CardTitle>
                   <div className="mb-2">
+                    {plan.originalPrice && (
+                      <div className="text-lg text-muted-foreground line-through mb-1">
+                        {plan.originalPrice}{plan.period}
+                      </div>
+                    )}
                     <span className="text-4xl font-bold">{plan.price}</span>
                     {plan.period && <span className="text-muted-foreground text-lg">{plan.period}</span>}
                   </div>

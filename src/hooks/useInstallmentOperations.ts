@@ -77,6 +77,8 @@ export const useInstallmentOperations = (
   };
 
   const markInstallmentAsUnpaid = async (installmentId: string) => {
+    if (!user) return;
+
     try {
       const { data, error } = await supabase
         .from('debt_installments')
@@ -104,6 +106,29 @@ export const useInstallmentOperations = (
           await updateDebt(debt.id, {
             paid_installments: debt.paid_installments - 1
           });
+        }
+
+        // Remover a transação de despesa criada quando foi marcada como paga
+        if (debt) {
+          try {
+            const { data: transactionsToDelete } = await supabase
+              .from('transactions')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('type', 'expense')
+              .eq('category', 'Pagamento de Dívidas')
+              .eq('amount', installment.amount)
+              .eq('description', `Pagamento parcela ${installment.installment_number} - ${debt.name}`);
+
+            if (transactionsToDelete && transactionsToDelete.length > 0) {
+              await supabase
+                .from('transactions')
+                .delete()
+                .in('id', transactionsToDelete.map(t => t.id));
+            }
+          } catch (transactionError) {
+            console.warn('Erro ao remover transação de pagamento:', transactionError);
+          }
         }
       }
 

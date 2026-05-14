@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFinancial, Transaction } from '@/contexts/FinancialContext';
 import { useCategories } from '@/contexts/CategoryContext';
@@ -11,7 +11,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { TrendingDown, ArrowDownCircle } from 'lucide-react';
 
 const Expenses = () => {
-  const { transactions, addTransaction, updateTransaction, deleteTransaction } = useFinancial();
+  const { transactions, addTransaction, updateTransaction, deleteTransaction, refreshData } = useFinancial();
+
+  useEffect(() => {
+    refreshData();
+  }, []);
   const { getCategoriesByType } = useCategories();
   const { toast } = useToast();
 

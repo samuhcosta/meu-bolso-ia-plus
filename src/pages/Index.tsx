@@ -373,11 +373,11 @@ const Index = () => {
             <CardContent className="p-8">
               <h3 className="text-2xl font-bold mb-2">Plano Pro</h3>
               <div className="mb-2">
-                <span className="text-5xl font-bold">R$ 19,90</span>
+                <span className="text-5xl font-bold">R$ 49,90</span>
                 <span className="text-muted-foreground text-lg">/mês</span>
               </div>
               <p className="text-sm text-primary font-medium mb-6">
-                ou R$ 197,00/ano (economize R$ 41,80)
+                ou R$ 538,90/ano (economize R$ 59,90)
               </p>
 
               <div className="grid grid-cols-2 gap-3 mb-8 text-left">
