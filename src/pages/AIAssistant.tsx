@@ -34,12 +34,15 @@ async function callGemini(contents: any[]): Promise<any> {
       });
       const json = await res.json();
 
-      if (json.candidates?.length) return json;
-      if (json.error?.message?.includes('not found') || json.error?.message?.includes('high demand')) {
+      if (!json.candidates && json.error) {
         lastError = json.error;
         continue;
       }
-      return json;
+
+      if (json.candidates?.length) return json;
+
+      lastError = { message: 'Resposta vazia do modelo' };
+      continue;
     } catch (e) {
       lastError = e;
       continue;
@@ -205,7 +208,7 @@ Responda em português brasileiro de forma amigável e direta.`;
         ];
 
         const json = await callGemini(contents);
-        let responseText = json.candidates[0].content.parts[0]?.text || '';
+        let responseText = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
         if (responseText.startsWith('CRIAR_TRANSACAO:')) {
           const desc = responseText.replace('CRIAR_TRANSACAO:', '').trim();
