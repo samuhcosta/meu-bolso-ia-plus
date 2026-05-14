@@ -28,7 +28,12 @@ async function callGemini(contents: any[]): Promise<string> {
   if (!json.candidates?.length) {
     throw new Error(json.error?.message || 'Erro ao processar');
   }
-  return json.candidates[0].content.parts[0]?.text || '';
+  let text = json.candidates[0].content.parts[0]?.text || '';
+  text = text.replace(/\*\*(.*?)\*\*/g, '$1');
+  text = text.replace(/___?(.*?)___?/g, '$1');
+  text = text.replace(/^[ \t]*\*[ \t]+/gm, '• ');
+  text = text.replace(/^[ \t]*-[ \t]+/gm, '• ');
+  return text;
 }
 
 async function fetchContext(userId: string) {
