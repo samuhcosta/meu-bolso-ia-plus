@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Bot, Send, MessageCircle, TrendingUp, TrendingDown, Target, Loader2 } from 'lucide-react';
+import { Bot, Send, TrendingUp, TrendingDown, Target, Loader2, LineChart } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -31,11 +31,12 @@ async function callGemini(contents: any[]): Promise<string> {
   return json.candidates[0].content.parts[0]?.text || '';
 }
 
-async function getContext(userId: string) {
-  const [transactions, goals, debts] = await Promise.all([
+async function fetchContext(userId: string) {
+  const [transactions, goals, debts, installments] = await Promise.all([
     supabase.from("transactions").select("*").eq("user_id", userId).then(r => r.data || []),
     supabase.from("goals").select("*").eq("user_id", userId).then(r => r.data || []),
     supabase.from("debts").select("*").eq("user_id", userId).then(r => r.data || []),
+    supabase.from("debt_installments").select("*, debts!inner(user_id)").eq("debts.user_id", userId).then(r => r.data || []),
   ]);
 
   const tx = transactions as any[];
@@ -56,19 +57,31 @@ async function getContext(userId: string) {
   }
   const topCats = Object.entries(cats).sort((a: any, b: any) => b[1] - a[1]).slice(0, 5);
 
+  const monthlyCats: Record<string, number> = {};
+  for (const t of monthly.filter((t: any) => t.type === "expense")) {
+    monthlyCats[t.category] = (monthlyCats[t.category] || 0) + Number(t.amount);
+  }
+  const topMonthlyCats = Object.entries(monthlyCats).sort((a: any, b: any) => b[1] - a[1]).slice(0, 5);
+
   const goalsData = (goals as any[]).map((g: any) => ({
     titulo: g.title,
     atual: Number(g.current_amount),
     meta: Number(g.target_amount),
     progresso: Math.min(Math.round((Number(g.current_amount) / Number(g.target_amount)) * 100), 100),
+    prazo: g.deadline,
   }));
 
   const debtsData = (debts as any[]).map((d: any) => ({
     nome: d.name,
     total: Number(d.total_amount),
-    pago: d.paid_installments,
-    parcelas: d.total_installments,
+    valor_parcela: Number(d.installment_amount),
+    parcelas_pagas: d.paid_installments,
+    total_parcelas: d.total_installments,
+    progresso: Math.min(Math.round((Number(d.paid_installments) / Number(d.total_installments)) * 100), 100),
   }));
+
+  const paidInstallments = (installments as any[]).filter((i: any) => i.is_paid);
+  const pendingInstallments = (installments as any[]).filter((i: any) => !i.is_paid);
 
   return JSON.stringify({
     saldo: allIncome - allExpenses,
@@ -76,9 +89,13 @@ async function getContext(userId: string) {
     despesas_total: allExpenses,
     receitas_mes: monthlyIncome,
     despesas_mes: monthlyExpenses,
-    top_categorias: topCats.map(([c, a]: any) => ({ categoria: c, valor: a })),
+    categorias_geral: topCats.map(([c, a]: any) => ({ categoria: c, valor: a })),
+    categorias_mes: topMonthlyCats.map(([c, a]: any) => ({ categoria: c, valor: a })),
     metas: goalsData,
     dividas: debtsData,
+    parcelas_pagas: paidInstallments.length,
+    parcelas_pendentes: pendingInstallments.length,
+    total_transacoes: tx.length,
   });
 }
 
@@ -86,7 +103,18 @@ const AIAssistant = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'assistant', content: `Olá, ${user?.name || 'usuário'}! Como posso ajudar com suas finanças?`, timestamp: new Date() }
+    {
+      id: '1',
+      role: 'assistant',
+      content: `Olá, ${user?.name || 'usuário'}! 👋
+
+Sou seu **Assistente Financeiro Estratégico**. Minha função é analisar seus dados financeiros, identificar oportunidades de melhoria e sugerir estratégias personalizadas para você organizar suas finanças.
+
+📊 *Posso ajudar com:* análises de gastos, tendências financeiras, saúde das suas metas, status das dívidas e dicas de economia baseadas no seu perfil.
+
+**Como posso te ajudar hoje?**`,
+      timestamp: new Date()
+    }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -104,65 +132,33 @@ const AIAssistant = () => {
     setLoading(true);
 
     try {
-      const lower = text.toLowerCase();
-      let result = '';
+      const context = await fetchContext(user.id);
 
-      // Detect "criar / registrar transação"
-      const createMatch = text.match(/(?:registre|crie|criar|adicionar|adiciona|lançar|inserir)\s+(?:uma\s+)?(?:receita|entrada|ganho|despesa|gasto|saída)/i);
-      const amountMatch = text.match(/(?:R?\$?\s*)?(\d+(?:[.,]\d{1,2})?)/);
-      if (createMatch && amountMatch) {
-        const amount = parseFloat(amountMatch[1].replace(',', '.'));
-        const isIncome = /receita|entrada|ganho|renda/i.test(text);
-        const category = ['transporte', 'alimentação', 'lazer', 'saúde', 'educação', 'moradia', 'assinatura', 'compras', 'salário', 'freela']
-          .find(k => text.toLowerCase().includes(k)) || 'Outros';
-
-        const { error } = await supabase.from("transactions").insert({
-          user_id: user.id, type: isIncome ? 'income' : 'expense', amount, category,
-          description: text.substring(0, 100),
-          date: new Date().toISOString().split('T')[0],
-        });
-
-        if (error) throw new Error(error.message);
-        result = `✅ ${isIncome ? 'Receita' : 'Despesa'} de R$ ${amount.toFixed(2).replace('.', ',')} registrada em "${category}"!`;
-      }
-
-      // Detect "adicionar valor à meta"
-      const goalAddMatch = text.match(/(?:adiciona|adicionar|colocar|coloca|acrescenta|aumenta)\s+(?:mais\s+)?(?:R?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:reais)?\s*(?:na|em|para|à)\s*(?:minha|meta|objetivo)/i);
-      if (goalAddMatch) {
-        const value = parseFloat(goalAddMatch[1].replace(',', '.'));
-        const { data: goals } = await supabase.from("goals").select("*").eq("user_id", user.id);
-        if (goals && goals.length > 0) {
-          const goal = goals[0];
-          await supabase.from("goals").update({ current_amount: Number(goal.current_amount) + value }).eq("id", goal.id);
-          result = `✅ Adicionado R$ ${value.toFixed(2).replace('.', ',')} à meta "${goal.title}"!`;
-        } else {
-          result = '❌ Você não tem nenhuma meta criada. Vá em Metas para criar uma primeiro.';
-        }
-      }
-
-      if (result) {
-        const msg: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: result, timestamp: new Date() };
-        setMessages(p => [...p, msg]);
-        setLoading(false);
-        return;
-      }
-
-      // Query mode: send to Gemini with context
-      const context = await getContext(user.id);
       const history = messages.slice(-8).filter(m => m.content.length < 500).map(m => ({
         role: m.role === 'user' ? 'user' as const : 'model' as const,
         parts: [{ text: m.content }],
       }));
 
-      const prompt = `Você é um assistente financeiro. Dados do usuário (JSON): ${context}
+      const prompt = `Você é um Analista Financeiro Estratégico sênior, especialista em finanças pessoais.
 
-Com base nesses dados, responda perguntas sobre saldo, gastos, categorias, metas e dívidas.
-Se perguntarem como economizar, dê dicas personalizadas baseadas nos gastos reais.
-Responda em português brasileiro de forma amigável e curta.`;
+Você recebeu os dados financeiros do usuário em formato JSON. Sua função é EXCLUSIVAMENTE analisar, interpretar e sugerir estratégias — você NUNCA cria, altera ou exclui nenhum dado.
+
+## Dados do usuário:
+${context}
+
+## Regras:
+1. Analise os dados com profundidade — não se limite a repetir os números
+2. Identifique padrões, tendências e oportunidades de melhoria
+3. Sugira estratégias personalizadas baseadas nos hábitos reais do usuário
+4. Quando relevante, compare gastos atuais com meses anteriores
+5. Aponte riscos (ex: muitas parcelas pendentes, gastos altos em categorias não essenciais)
+6. Seja motivador mas honesto — se a situação financeira precisar de atenção, diga com clareza
+7. Responda em português brasileiro, tom profissional e amigável
+8. Use formatação simples com marcadores quando ajudar na legibilidade`;
 
       const reply = await callGemini([
         { role: 'user', parts: [{ text: prompt }] },
-        { role: 'model', parts: [{ text: 'Entendi! Tenho os dados financeiros.' }] },
+        { role: 'model', parts: [{ text: 'Compreendo os dados. Estou pronto para analisar e sugerir estratégias financeiras personalizadas.' }] },
         ...history,
         { role: 'user', parts: [{ text }] },
       ]);
@@ -177,18 +173,21 @@ Responda em português brasileiro de forma amigável e curta.`;
   };
 
   const quickQuestions = [
+    { text: "Análise completa", icon: LineChart },
     { text: "Onde gastei mais?", icon: TrendingDown },
     { text: "Como economizar?", icon: TrendingUp },
-    { text: "Qual meu saldo?", icon: Bot },
-    { text: "Resumo financeiro", icon: Target }
+    { text: "Saúde das metas", icon: Target },
   ];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div><h1 className="text-3xl font-bold">Assistente IA</h1><p className="text-muted-foreground">Converse sobre suas finanças</p></div>
+      <div>
+        <h1 className="text-3xl font-bold">Assistente IA</h1>
+        <p className="text-muted-foreground">Analista financeiro estratégico para suas finanças</p>
+      </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-lg">Perguntas Rápidas</CardTitle><CardDescription>Clique ou digite sua mensagem</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="text-lg">Análises Rápidas</CardTitle><CardDescription>Clique em um tema ou faça sua própria pergunta</CardDescription></CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {quickQuestions.map((q, i) => (
@@ -201,7 +200,7 @@ Responda em português brasileiro de forma amigável e curta.`;
       </Card>
 
       <Card className="h-[600px] flex flex-col">
-        <CardHeader><CardTitle className="flex items-center"><Bot className="w-5 h-5 mr-2 text-primary" />Chat com IA</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Bot className="w-5 h-5 text-primary" />Assistente Financeiro Estratégico</CardTitle></CardHeader>
         <CardContent className="flex-1 overflow-y-auto space-y-4">
           {messages.map(m => (
             <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -219,7 +218,7 @@ Responda em português brasileiro de forma amigável e curta.`;
           {loading && (
             <div className="flex justify-start">
               <div className="bg-muted text-muted-foreground p-3 rounded-lg flex items-center gap-2">
-                <Bot className="w-4 h-4 text-primary" /><Loader2 className="w-4 h-4 animate-spin" /><span className="text-sm">Processando...</span>
+                <Bot className="w-4 h-4 text-primary" /><Loader2 className="w-4 h-4 animate-spin" /><span className="text-sm">Analisando dados...</span>
               </div>
             </div>
           )}
@@ -227,7 +226,7 @@ Responda em português brasileiro de forma amigável e curta.`;
         </CardContent>
         <div className="p-4 border-t">
           <div className="flex space-x-2">
-            <Input value={input} onChange={e => setInput(e.target.value)} placeholder="Digite sua pergunta..." onKeyDown={e => e.key === 'Enter' && handleSend()} disabled={loading} />
+            <Input value={input} onChange={e => setInput(e.target.value)} placeholder="Ex: Analise meus gastos do mês..." onKeyDown={e => e.key === 'Enter' && handleSend()} disabled={loading} />
             <Button onClick={handleSend} disabled={!input.trim() || loading}><Send className="w-4 h-4" /></Button>
           </div>
         </div>
@@ -236,14 +235,15 @@ Responda em português brasileiro de forma amigável e curta.`;
       <Card className="bg-gradient-to-r from-primary/5 to-secondary/5">
         <CardContent className="pt-6">
           <div className="flex items-start space-x-3">
-            <MessageCircle className="w-5 h-5 text-primary mt-1" />
+            <LineChart className="w-5 h-5 text-primary mt-1" />
             <div>
-              <h3 className="font-medium mb-2">💡 Exemplos</h3>
+              <h3 className="font-medium mb-2">📊 O que este assistente faz</h3>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• "Onde gastei mais este mês?"</li>
-                <li>• "Registre uma despesa de R$ 50 de transporte"</li>
-                <li>• "Adicione mais R$ 100 na minha meta"</li>
-                <li>• "Qual meu saldo?" ou "Resumo financeiro"</li>
+                <li>• Análise detalhada de gastos por categoria</li>
+                <li>• Diagnóstico da saúde financeira e tendências</li>
+                <li>• Estratégias personalizadas de economia</li>
+                <li>• Acompanhamento de metas e dívidas</li>
+                <li>• Sugestões de orçamento e planejamento</li>
               </ul>
             </div>
           </div>
